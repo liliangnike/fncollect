@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fncollect"
+version = "0.1.0"
+description = "A clean-room, multi-vendor Fixed Network (FN) OLT/ONT log collector and troubleshooting assistant."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "fncollect contributors" }]
+keywords = ["fttx", "pon", "olt", "ont", "diagnostics", "log-collector", "fixed-network"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "pydantic>=2.5,<3",
+    "PyYAML>=6.0",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+net = [
+    "paramiko>=3.4",
+    "aiossh>=0.16",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pyinstaller>=6",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+fncollect = "fncollect.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

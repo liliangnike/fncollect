@@ -1,0 +1,13 @@
+name: basic_collect
+vendor: mock
+description: Collect basic inventory and alarm info from a device.
+steps:
+  - id: s1
+    command: "show version"
+    save: "inventory/version.txt"
+  - id: s2
+    command: "show alarms"
+    save: "inventory/alarms.txt"
+  - id: s3
+    command: "show ont summary"
+    save: "inventory/ont-summary.txt"

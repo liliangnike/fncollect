@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local config & secrets (NEVER commit)
+user/
+secrets.env
+*.local.yml
+
+# Output artifacts
+fncollect_out/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

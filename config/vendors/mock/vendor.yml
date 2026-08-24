@@ -1,0 +1,11 @@
+vendor: mock
+description: Deterministic in-memory vendor used for tests and demos.
+transport: mock
+device_types:
+  - mock-OLT-1000
+prompts:
+  cli: "mock# "
+actions:
+  - inventory
+dcps:
+  - config/dcps/basic_collect.yml
