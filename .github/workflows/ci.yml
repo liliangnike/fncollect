@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Lint
+        run: python -m ruff check src tests
+      - name: Test
+        run: pytest
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build binary
+        run: |
+          pip install pyinstaller
+          pip install -e .
+          pyinstaller fncollect.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fncollect-binary
+          path: dist/fncollect
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build binary
+        run: |
+          pip install pyinstaller
+          pip install -e .
+          pyinstaller fncollect.spec
+      - name: Archive binary
+        run: tar -czf fncollect-linux-x86_64.tar.gz -C dist/fncollect .
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: fncollect ${{ github.ref_name }}
+          body: |
+            Standalone Linux build of fncollect (no Python required).
+            Download, extract, and run `./fncollect`.
+          files: fncollect-linux-x86_64.tar.gz
