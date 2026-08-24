@@ -6,10 +6,13 @@ templating in ``fncollect/dcp.py`` and flip ``strict=False`` to ``True`` /
 remove the marker once they pass.
 
 What to implement:
-  * ``wait``  : sleep before executing a step when ``step.wait`` is set.
-  * `loop`    : repeat a step over a list of values from context; render
-                ``{{ item }}`` in the command and derive a unique save path
-                (e.g. append "-a", "-b") so artifacts don't collide.
+  * ``wait``      : sleep before executing a step when ``step.wait`` is set.
+  * `loop`        : repeat a step over a list of context values; render
+                    ``{{ item }}`` in the command and derive a unique save
+                    path (e.g. append "-a", "-b") so artifacts don't collide.
+  * ``condition`` : gate a step on a boolean expression evaluated against the
+                    variable context (``step.condition``), using
+                    ``safe_eval`` from fncollect.variables.
 """
 
 import asyncio
@@ -100,3 +103,22 @@ async def test_loop_step_expands_artifacts(run_ctx):
     results = await execute_dcp(dcp, device, run_ctx)
     assert results["steps"][0]["ok"] is True
     assert len(run_ctx._manifest["artifacts"]) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="learning task: condition gating not implemented", strict=False)
+async def test_condition_step_skips_on_false_expression(run_ctx):
+    dcp = DcpDefinition(
+        name="cond_dcp",
+        vendor="mock",
+        steps=[
+            DcpStep(id="s1", command="show version", condition="model == 'absent'"),
+            DcpStep(id="s2", command="show alarms"),
+        ],
+    )
+    mock = MockVendor()
+    device = mock.create_device(mock.device_info())
+    results = await execute_dcp(dcp, device, run_ctx, seed_variables={"model": "x"})
+    by_id = {s["id"]: s for s in results["steps"]}
+    assert by_id["s1"]["skipped"] is True
+    assert by_id["s2"]["ok"] is True

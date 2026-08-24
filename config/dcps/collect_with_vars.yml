@@ -1,0 +1,16 @@
+name: collect_with_vars
+vendor: mock
+description: Demonstrate variable extraction, derivation and templating.
+parameters:
+  - name: ont_id
+    type: string
+    default: "2"
+steps:
+  - id: s1
+    command: "show version"
+    extract:
+      - {name: sw_version, regex: "Software: ([0-9.]+)", group: 1}
+      - {name: model, regex: "Model: (\\S+)", group: 1}
+  - id: s2
+    command: "show ont summary"
+    save: "inventory/ont-{{ ont_id }}-summary.txt"

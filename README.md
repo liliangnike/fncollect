@@ -31,6 +31,7 @@ src/fncollect/
   config.py             # Pydantic config loading + validation
   logging_setup.py      # console + rolling file, secret redaction
   session_ctx.py        # per-run dir + manifest
+  variables.py          # typed variable context, safe expressions, templating
   vendor.py             # abstract Vendor/Device/Action contracts
   dcp.py                # DCP engine + meta-ops (loop/wait/skip) [WIP]
   vendors/              # pluggable vendor packs
@@ -109,6 +110,33 @@ Notes:
   modules so packaged runs find them at runtime.
 - The CI workflow also builds the binary on every push and uploads it as an
   artifact (`Actions` → latest run → `fncollect-binary`).
+
+## DCP with variables
+
+A DCP can declare typed parameters, extract variables from command output,
+derive new variables with safe expressions, and substitute them into
+commands and save paths via `{{ name }}`:
+
+```yaml
+name: collect_with_vars
+vendor: mock
+parameters:                 # declared + validated inputs
+  - {name: ont_id, type: string, default: "2"}
+derivations:                # computed from other variables (safe expressions)
+  - {name: ont_dir, from: [ont_id], expr: "ont_id + '-suffix'"}
+steps:
+  - id: s1
+    command: "show version"
+    extract:                # parse values out of the command output
+      - {name: sw_version, regex: "Software: ([0-9.]+)", group: 1}
+  - id: s2
+    command: "show ont {{ ont_id }}"   # templated command
+    save: "ont/{{ ont_id }}.txt"        # templated save path
+```
+
+Safety: only whitelisted string methods (`split`, `upper`, `lower`,
+`strip`, `replace`), arithmetic/comparison operators and context variables
+are allowed in expressions — no arbitrary code execution.
 
 ## Terminals
 
