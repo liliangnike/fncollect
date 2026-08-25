@@ -32,28 +32,25 @@ class CommandResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# Default ports per transport.
-DEFAULT_PORTS: dict[str, int] = {
-    "ssh": 22,
-    "telnet": 23,
-    "netconf": 830,
-    "mock": 0,
-}
+# Default ports per transport are carried by the corresponding Session
+# class (SSHSession=22, TelnetSession=23, NetconfSession=830, and so on).
 
 
 @dataclass
 class Endpoint:
-    """Where and how to reach a device."""
+    """Where and how to reach a device.
+
+    The ``port`` is filled by the Session that owns the connection (each
+    session type knows its own default port). An explicitly-set ``port``
+    always wins.
+    """
 
     hostname: str
     transport: str = "ssh"
     port: int | None = None
     username: str | None = None
     password: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.port is None:
-            self.port = DEFAULT_PORTS.get(self.transport)
+    session_type: str | None = None
 
     @property
     def address(self) -> str:
@@ -63,11 +60,30 @@ class Endpoint:
 class Session(ABC):
     """A single logical connection to a device.
 
-    Implementations must handle their own prompt matching and framing.
+    Implementations handle their own prompt matching and framing, and
+    declare the default port (and prompt) characteristic of their session
+    type -- e.g. an SSH CLI session on port 22 vs an SSH TND session on
+    port 11130.
     """
 
+    #: Default remote port for this specific session type.
+    default_port: int = 22
+    #: Regex used to detect the device prompt after commands.
+    prompt_pattern: str = r"[>#$%]"
+
     def __init__(self, endpoint: Endpoint) -> None:
+        if endpoint.port is None:
+            endpoint.port = self.default_port
         self.endpoint = endpoint
+        # Copy the class default onto the instance so it can be overridden
+        # per-session (e.g. from config) without mutating the class.
+        self.prompt_pattern = type(self).prompt_pattern
+
+    def apply_profile(self, port: int | None = None, prompt: str | None = None) -> None:
+        if port is not None:
+            self.endpoint.port = port
+        if prompt is not None:
+            self.prompt_pattern = prompt
 
     @property
     def transport(self) -> str:
@@ -84,3 +100,49 @@ class Session(ABC):
     @abstractmethod
     async def close(self) -> None:
         """Close the connection and release resources."""
+
+
+class SSHSession(Session):
+    """Base SSH CLI session (port 22 by default).
+
+    Concrete device SSH CLI sessions subclass this; those that share the
+    SSH transport but use a different port (e.g. a TND session on 11130)
+    override ``default_port`` (and usually ``prompt_pattern``).
+    """
+
+    default_port = 22
+
+    async def connect(self) -> None:
+        raise NotImplementedError("SSH transport adapter not wired yet")
+
+    async def exec_cmd(self, command: str) -> CommandResult:
+        raise NotImplementedError("SSH transport adapter not wired yet")
+
+    async def close(self) -> None:
+        return None
+
+
+class TelnetSession(Session):
+    default_port = 23
+
+    async def connect(self) -> None:
+        raise NotImplementedError("Telnet transport adapter not wired yet")
+
+    async def exec_cmd(self, command: str) -> CommandResult:
+        raise NotImplementedError("Telnet transport adapter not wired yet")
+
+    async def close(self) -> None:
+        return None
+
+
+class NetconfSession(Session):
+    default_port = 830
+
+    async def connect(self) -> None:
+        raise NotImplementedError("NETCONF transport adapter not wired yet")
+
+    async def exec_cmd(self, command: str) -> CommandResult:
+        raise NotImplementedError("NETCONF transport adapter not wired yet")
+
+    async def close(self) -> None:
+        return None

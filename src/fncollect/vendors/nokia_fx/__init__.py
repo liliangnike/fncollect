@@ -1,13 +1,20 @@
 """Exemplar Nokia FX-style vendor pack (CLI dialect stub).
 
 Illustrates the Vendor/Session/Device contract a real pack would fill in with
-paramiko/aiossh adapters behind the same interface.
+paramiko/aiossh adapters behind the same interface. In particular it shows
+that different *session types* to the same box can use different SSH ports
+and prompts (e.g. ISAM_CLI on 22 vs NT_TND on 11130).
 """
 
 from __future__ import annotations
 
 from fncollect.discovery import discover_hardware
-from fncollect.sessions import CommandResult, Endpoint, Session
+from fncollect.sessions import (  # noqa: F401
+    CommandResult,
+    Endpoint,
+    Session,
+    SSHSession,
+)
 from fncollect.vendor import (
     BaseDevice,
     Device,
@@ -18,15 +25,18 @@ from fncollect.vendor import (
 from fncollect.vendors.registry import registry
 
 
-class FxSession(Session):
-    async def connect(self) -> None:
-        return None
+class FxCLISession(SSHSession):
+    """Console/CLI session -- standard SSH port 22."""
 
-    async def exec_cmd(self, command: str) -> CommandResult:
-        raise NotImplementedError("transport adapter not wired yet")
+    default_port = 22
+    prompt_pattern = r"\w+[>#]"
 
-    async def close(self) -> None:
-        return None
+
+class FxTndSession(SSHSession):
+    """TND (network termination daemon) session -- non-standard SSH port."""
+
+    default_port = 11130
+    prompt_pattern = r"TND[>#]"
 
 
 class FxDevice(BaseDevice):
@@ -50,11 +60,15 @@ class FxVendor(Vendor):
             model="OLT-FX",
             ip="0.0.0.0",
             role=DeviceRole.OLT,
-            transport="cli",
+            transport="ssh",
+            session_type="cli",
         )
 
-    def create_session(self, endpoint: Endpoint) -> Session:
-        return FxSession(endpoint)
+    def session_types(self) -> dict[str, type[Session]]:
+        return {
+            "cli": FxCLISession,
+            "tnd": FxTndSession,
+        }
 
     def create_hardware(self, info: DeviceInfo, session: Session) -> Device:
         hardware_cls = discover_hardware(

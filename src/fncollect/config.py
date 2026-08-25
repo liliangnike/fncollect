@@ -41,6 +41,37 @@ class ConcurrencyConfig(BaseModel):
     command_timeout_sec: float = 30.0
 
 
+class SessionProfile(BaseModel):
+    """Overridable connection characteristics for a session type.
+
+    ``None`` values mean "fall back to the session class default".
+    """
+
+    port: int | None = None
+    prompt: str | None = None
+
+
+class VendorConfig(BaseModel):
+    """Declarative description of a vendor pack (config/vendors/<name>/vendor.yml)."""
+
+    vendor: str
+    description: str = ""
+    transport: str = "ssh"
+    device_types: list[str] = Field(default_factory=list)
+    sessions: dict[str, SessionProfile] = Field(default_factory=dict)
+    actions: list[str] = Field(default_factory=list)
+    dcps: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def load(cls, name: str, project_root: Path) -> VendorConfig | None:
+        path = project_root / "config" / "vendors" / name / "vendor.yml"
+        if not path.exists():
+            return None
+        data = yaml.safe_load(path.read_text()) or {}
+        data.setdefault("vendor", name)
+        return cls.model_validate(data)
+
+
 class ToolConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     run: RunConfig = Field(default_factory=RunConfig)

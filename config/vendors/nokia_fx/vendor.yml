@@ -1,10 +1,15 @@
 vendor: nokia_fx
 description: Exemplar GPON FX-style CLI dialect pack (illustrative, not wired to real transport).
-transport: cli
+transport: ssh
 device_types:
   - OLT-FX
-prompts:
-  cli: "OLTFX> "
+sessions:
+  cli:
+    port: 22
+    prompt: "\\w+[>#]"
+  tnd:
+    port: 11130
+    prompt: "TND[>#]"
 actions:
   - inventory
   - log_collection

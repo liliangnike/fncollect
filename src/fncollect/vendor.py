@@ -23,6 +23,7 @@ from fncollect.sessions import (  # noqa: F401  (re-exported)
     DeviceConnectionError,
     Endpoint,
     Session,
+    SSHSession,
 )
 
 
@@ -43,6 +44,7 @@ class DeviceInfo:
     role: DeviceRole = DeviceRole.OLT
     hardware_type: str | None = None
     transport: str = "ssh"
+    session_type: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -119,14 +121,52 @@ class Vendor(ABC):
         """Describe a default device for this vendor."""
 
     @abstractmethod
-    def create_session(self, endpoint: Endpoint) -> Session:
-        """Create a session of the transport this vendor expects."""
-
-    @abstractmethod
     def create_hardware(
         self, info: DeviceInfo, session: Session
     ) -> Device:
         """Dispatch to the concrete hardware class for the device."""
+
+    def session_types(self) -> dict[str, type[Session]]:
+        """Map of session-type name to session class for this vendor."""
+        return {}
+
+    def vendor_config(self) -> Any:
+        """Load this vendor's declarative config (cached)."""
+        if not hasattr(self, "_vendor_config"):
+            from fncollect.config import VendorConfig, guess_project_root
+
+            self._vendor_config = VendorConfig.load(self.name, guess_project_root())
+        return self._vendor_config
+
+    def resolve_profile(self, session_type: str | None) -> Any:
+        """Return the SessionProfile overrides for a session type, if any."""
+        config = self.vendor_config()
+        if not config or not session_type:
+            return None
+        return config.sessions.get(session_type)
+
+    def get_session_class(self, session_type: str | None) -> type[Session]:
+        types = self.session_types()
+        if session_type and session_type in types:
+            return types[session_type]
+        return types.get("default", next(iter(types.values()), SSHSession))
+
+    def create_session(self, endpoint: Endpoint) -> Session:
+        """Create a session for an endpoint.
+
+        Precedence: explicitly-set ``endpoint.port`` > vendor config
+        (``sessions.<type>.port``) > session class default.
+        """
+        explicit_port = endpoint.port  # None if the caller did not set one
+        session_cls = self.get_session_class(endpoint.session_type)
+        session = session_cls(endpoint)
+        profile = self.resolve_profile(endpoint.session_type)
+        if profile is not None:
+            if explicit_port is None:
+                session.apply_profile(port=profile.port, prompt=profile.prompt)
+            else:
+                session.apply_profile(prompt=profile.prompt)
+        return session
 
     def create_device(
         self, info: DeviceInfo | None = None, session: Session | None = None
@@ -137,6 +177,7 @@ class Vendor(ABC):
             Endpoint(
                 hostname=info.ip,
                 transport=info.transport,
+                session_type=info.session_type,
             )
         )
         return self.create_hardware(info, session)

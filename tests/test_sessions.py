@@ -3,15 +3,70 @@
 import pytest
 
 from fncollect.discovery import discover_hardware, normalize_type
-from fncollect.sessions import Endpoint
+from fncollect.sessions import (
+    Endpoint,
+    NetconfSession,
+    SSHSession,
+    TelnetSession,
+)
 from fncollect.vendor import DeviceRole
 from fncollect.vendors.mock import MockDevice, MockVendor
 
 
-def test_endpoint_default_port_by_transport():
-    assert Endpoint(hostname="h", transport="ssh").port == 22
-    assert Endpoint(hostname="h", transport="netconf").port == 830
-    assert Endpoint(hostname="h", transport="telnet").port == 23
+def test_session_class_default_ports():
+    assert SSHSession(Endpoint(hostname="h")).endpoint.port == 22
+    assert NetconfSession(Endpoint(hostname="h")).endpoint.port == 830
+    assert TelnetSession(Endpoint(hostname="h")).endpoint.port == 23
+
+
+def test_session_type_sets_different_ssh_ports():
+    from fncollect.vendors import nokia_fx
+
+    vendor = nokia_fx.FxVendor()
+    cli = vendor.create_session(Endpoint(hostname="h", session_type="cli"))
+    tnd = vendor.create_session(Endpoint(hostname="h", session_type="tnd"))
+    assert cli.endpoint.port == 22
+    assert tnd.endpoint.port == 11130
+    assert cli.endpoint.transport == "ssh"
+    assert tnd.endpoint.transport == "ssh"
+
+
+def test_explicit_port_overrides_session_default():
+    from fncollect.vendors import nokia_fx
+
+    vendor = nokia_fx.FxVendor()
+    session = vendor.create_session(
+        Endpoint(hostname="h", session_type="tnd", port=2222)
+    )
+    assert session.endpoint.port == 2222
+
+
+def test_config_overrides_port_and_prompt():
+    from fncollect.vendors import mock as mock_pkg
+
+    vendor = mock_pkg.MockVendor()
+    session = vendor.create_session(Endpoint(hostname="h", session_type="cli"))
+    assert session.endpoint.port == 2222  # overridden by vendor.yml
+
+    fx = _fx_vendor()
+    tnd = fx.create_session(Endpoint(hostname="h", session_type="tnd"))
+    assert tnd.endpoint.port == 11130
+    assert tnd.prompt_pattern == "TND[>#]"
+
+
+def test_unconfigured_session_uses_class_default():
+    from fncollect.vendors import nokia_fx
+
+    vendor = nokia_fx.FxVendor()
+    # a session type with no config entry falls back to class default
+    session = vendor.create_session(Endpoint(hostname="h", session_type="cli"))
+    assert session.endpoint.port == 22
+
+
+def _fx_vendor():
+    from fncollect.vendors import nokia_fx
+
+    return nokia_fx.FxVendor()
 
 
 def test_vendor_creates_device_with_session():

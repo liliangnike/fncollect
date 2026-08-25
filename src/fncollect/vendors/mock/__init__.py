@@ -25,6 +25,8 @@ _RESPONSES: dict[str, str] = {
 class MockSession(Session):
     """In-memory session that returns canned responses."""
 
+    default_port = 22
+
     def __init__(self, endpoint: Endpoint) -> None:
         super().__init__(endpoint)
         self.connected = False
@@ -66,8 +68,12 @@ class MockVendor(Vendor):
             transport="mock",
         )
 
-    def create_session(self, endpoint: Endpoint) -> Session:
-        return MockSession(endpoint)
+    def session_types(self) -> dict[str, type[Session]]:
+        return {
+            "default": MockSession,
+            "cli": MockSession,
+            "tnd": MockSession,
+        }
 
     def create_hardware(self, info: DeviceInfo, session: Session) -> Device:
         hardware_cls = discover_hardware(
