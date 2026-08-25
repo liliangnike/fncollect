@@ -73,7 +73,7 @@ async def cmd_run(args: argparse.Namespace) -> int:
         info.ip = args.device
     device = vendor.create_device(info)
 
-    await device.connect({"username": "demo", "password": "demo"})
+    await device.connect()
     log.info("connected to %s (%s)", vendor_name, info.ip)
 
     dcp_text = _load_dcp_text(args.dcp)

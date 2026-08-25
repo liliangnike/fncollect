@@ -1,32 +1,38 @@
-"""Abstract interfaces for fncollect.
+"""Abstract contracts for fncollect.
 
 A *vendor* is a collection of device types that share a command dialect,
-prompt conventions and login behaviour. A *device* is a concrete box the
-tool talks to; an *action* is one unit of work (inventory, log collection,
-cutthrough, ...) that a device can perform.
+login behaviour and transport options. A *device* is a concrete box the tool
+collects from, composed of a *session* (how to talk) and a *role* / hardware
+type (what it is, e.g. OLT/NT/LT/ONT). An *action* is one unit of work a
+device can perform.
+
+Sessions, CommandResult and connection/command errors live in
+``fncollect.sessions`` and are re-exported here for convenience.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
+from fncollect.sessions import (  # noqa: F401  (re-exported)
+    CommandError,
+    CommandResult,
+    DeviceConnectionError,
+    Endpoint,
+    Session,
+)
 
-class DeviceConnectionError(RuntimeError):
-    """Raised when a device cannot be reached or authenticated."""
 
+class DeviceRole(str, Enum):
+    """What the device is within a fixed-network topology."""
 
-class CommandError(RuntimeError):
-    """Raised when a command on a device fails."""
-
-
-@dataclass
-class CommandResult:
-    command: str
-    output: str
-    exit_code: int = 0
-    duration_sec: float = 0.0
+    OLT = "olt"
+    NT = "nt"
+    LT = "lt"
+    ONT = "ont"
 
 
 @dataclass
@@ -34,27 +40,61 @@ class DeviceInfo:
     vendor: str
     model: str
     ip: str
+    role: DeviceRole = DeviceRole.OLT
+    hardware_type: str | None = None
+    transport: str = "ssh"
     extra: dict[str, Any] = field(default_factory=dict)
 
 
 class Device(ABC):
-    """A single box to collect from."""
+    """A single box to collect from.
+
+    A device is identified by its role/hardware and talks through a session.
+    """
+
+    role: DeviceRole = DeviceRole.OLT
+
+    def __init__(self, info: DeviceInfo, session: Session | None = None) -> None:
+        self.info = info
+        self._session = session
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            raise DeviceConnectionError(f"no session attached to device {self.info.ip}")
+        return self._session
 
     @abstractmethod
-    async def connect(self, credentials: dict[str, str]) -> None:
-        """Open a session to the device."""
+    async def connect(self) -> None:
+        """Open the session to the device."""
 
     @abstractmethod
     async def exec_cmd(self, command: str) -> CommandResult:
         """Run one command and return its output."""
 
-    @abstractmethod
     async def collect(self, command: str) -> CommandResult:
-        """Alias of exec_cmd used by collection steps."""
+        return await self.exec_cmd(command)
 
     @abstractmethod
     async def disconnect(self) -> None:
         """Close the session and release resources."""
+
+
+class BaseDevice(Device):
+    """Default Device implementation that delegates to a session."""
+
+    def __init__(self, info: DeviceInfo, session: Session) -> None:
+        super().__init__(info, session)
+        self.role = info.role
+
+    async def connect(self) -> None:
+        await self.session.connect()
+
+    async def exec_cmd(self, command: str) -> CommandResult:
+        return await self.session.exec_cmd(command)
+
+    async def disconnect(self) -> None:
+        await self.session.close()
 
 
 class Action(ABC):
@@ -70,17 +110,36 @@ class Action(ABC):
 
 
 class Vendor(ABC):
-    """A family of devices sharing dialect and behaviour."""
+    """A family of devices sharing dialect, login and transports."""
 
     name: str = "abstract"
 
     @abstractmethod
     def device_info(self) -> DeviceInfo:
-        """Describe the vendor (model, ip) for device creation."""
+        """Describe a default device for this vendor."""
 
     @abstractmethod
-    def create_device(self, info: DeviceInfo) -> Device:
-        """Create a device object for this vendor from its info."""
+    def create_session(self, endpoint: Endpoint) -> Session:
+        """Create a session of the transport this vendor expects."""
+
+    @abstractmethod
+    def create_hardware(
+        self, info: DeviceInfo, session: Session
+    ) -> Device:
+        """Dispatch to the concrete hardware class for the device."""
+
+    def create_device(
+        self, info: DeviceInfo | None = None, session: Session | None = None
+    ) -> Device:
+        """Convenience: build an info-derived session and dispatch to hardware."""
+        info = info or self.device_info()
+        session = session or self.create_session(
+            Endpoint(
+                hostname=info.ip,
+                transport=info.transport,
+            )
+        )
+        return self.create_hardware(info, session)
 
     def registered_actions(self) -> list[str]:
         return []
