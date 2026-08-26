@@ -107,6 +107,13 @@ class RunCommandsAction(CommandBatchAction):
     subdir = "commands"
 
 
+class OntInventoryAction(CommandBatchAction):
+    """ONT equipment inventory (gatewayed via the OLT CLI, read-only)."""
+
+    name = "ont_inventory"
+    subdir = "ont"
+
+
 def _filename(command: str, idx: int) -> str:
     base = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in command)
     base = base[:60] or "command"
@@ -134,6 +141,7 @@ class ActionRegistry:
 registry = ActionRegistry()
 registry.register(InventoryAction)
 registry.register(RunCommandsAction)
+registry.register(OntInventoryAction)
 
 
 async def run_action(

@@ -214,15 +214,21 @@ class Vendor(ABC):
         return session
 
     def create_device(
-        self, info: DeviceInfo | None = None, session: Session | None = None
+        self,
+        info: DeviceInfo | None = None,
+        session: Session | None = None,
+        credentials: dict[str, str] | None = None,
     ) -> Device:
         """Convenience: build an info-derived session and dispatch to hardware."""
         info = info or self.device_info()
+        cred = credentials or {}
         session = session or self.create_session(
             Endpoint(
                 hostname=info.ip,
                 transport=info.transport,
                 session_type=info.session_type,
+                username=cred.get("username"),
+                password=cred.get("password"),
             )
         )
         return self.create_hardware(info, session)

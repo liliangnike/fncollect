@@ -33,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--action", default="inventory", help="action name (inventory, run_commands)")
     collect.add_argument("--devices", default=None, help="comma-separated device IPs")
     collect.add_argument("--commands", default=None, help="comma-separated commands (for run_commands)")
+    collect.add_argument("--user", default=None, help="login username")
+    collect.add_argument("--password", default=None, help="login password")
 
     sub.add_parser("interact", help="interactive guided menu (launch)")
     sub.add_parser("init", help="scaffold local user/ config tree")
@@ -136,13 +138,23 @@ def _summarize(results, log) -> None:
             log.error("step %s failed: %s", step.get("id"), step.get("error"))
 
 
-def execute_collect(vendor_name: str, action: str, devices: str, commands: str | None = None) -> int:
+def execute_collect(
+    vendor_name: str,
+    action: str,
+    devices: str,
+    commands: str | None = None,
+    credentials: dict[str, str] | None = None,
+) -> int:
     """Shared entry: run an action across comma-separated device IPs."""
-    return asyncio.run(_collect(vendor_name, action, devices, commands))
+    return asyncio.run(_collect(vendor_name, action, devices, commands, credentials))
 
 
 async def _collect(
-    vendor_name: str, action: str, devices: str, commands: str | None = None
+    vendor_name: str,
+    action: str,
+    devices: str,
+    commands: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> int:
     from fncollect.actions import action_work
     from fncollect.engine import ConcurrentRunner
@@ -164,7 +176,9 @@ async def _collect(
     for ip in ips:
         info = vendor.device_info()
         info.ip = ip
-        mock_devices.append(vendor.create_device(info))
+        mock_devices.append(
+            vendor.create_device(info, credentials=credentials)
+        )
 
     params = {"commands": commands.split(",")} if commands else None
     runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
@@ -185,6 +199,20 @@ async def _collect(
         print(f"  {name} -> {path}")
     print(f"manifest      -> {manifest}")
     return 0 if summary["failed"] == 0 else 1
+
+
+def _credentials(args) -> dict[str, str]:
+    """Resolve login credentials from CLI flags or env, avoiding logs."""
+    import os
+
+    username = args.user or os.environ.get("FNCOLLECT_USER")
+    password = args.password or os.environ.get("FNCOLLECT_PASSWORD")
+    creds: dict[str, str] = {}
+    if username:
+        creds["username"] = username
+    if password:
+        creds["password"] = password
+    return creds
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -209,7 +237,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "collect":
         try:
             return execute_collect(
-                args.vendor or "mock", args.action, args.devices or "", args.commands
+                args.vendor or "mock",
+                args.action,
+                args.devices or "",
+                args.commands,
+                _credentials(args),
             )
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)

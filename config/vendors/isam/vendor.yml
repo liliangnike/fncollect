@@ -1,0 +1,24 @@
+vendor: isam
+description: Nokia ISAM (7360/7362) OLT -- real interactive SSH CLI with context navigation.
+transport: ssh
+device_types:
+  - 7360-ISAM
+  - 7362-ISAM
+sessions:
+  cli:
+    port: 22
+    prompt: "typ:\\S+(?:>[^>#]+)*#"
+actions:
+  - inventory
+  - ont_inventory
+  - run_commands
+commands:
+  inventory:
+    - "show\nsystem\nentry"
+    - "show\nequipment\nshelf-summary"
+    - "show\nequipment\nslot"
+  ont_inventory:
+    - "show\nequipment\nont\nstatus"
+    - "show\npon\nunprovision-onu"
+    - "show\npon\nsfp-inventory"
+dcps: []

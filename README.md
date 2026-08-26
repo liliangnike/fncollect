@@ -46,6 +46,8 @@ src/fncollect/
   vendors/              # pluggable vendor packs
     mock/               # deterministic in-memory vendor (tests/demo)
     nokia_fx/           # exemplar CLI-dialect pack
+    isam/               # Nokia ISAM (7360/7362) real interactive SSH
+  net.py                # real interactive SSH session (prompt, paging, legacy)
 tests/                  # pytest suite
 ```
 
@@ -196,14 +198,28 @@ a generic fallback.
 - `fncollect collect` — run a semantic action across many devices, concurrently:
   ```bash
   fncollect collect --vendor mock --action inventory --devices 10.0.0.1,10.0.0.2
-  fncollect collect --vendor mock --action run_commands --commands "show version,show alarms"
+  fncollect collect --vendor isam --action inventory --devices 10.52.142.74 --user admin --password ...
   ```
+  Credentials can come from `--user`/`--password` or environment
+  `FNCOLLECT_USER` / `FNCOLLECT_PASSWORD` (never logged).
 - `fncollect interact` — guided interactive menu (vendor → action → target).
 - `fncollect vendors` / `fncollect actions` — list what's available.
 - `fncollect init` — scaffold local `user/` config.
 
 Each run writes `manifest.json`, `app.log`, raw artifacts, and reports
 (`summary.md`, `results.json`, `results.csv`) under `fncollect_out/`.
+
+## Real devices (legacy SSH)
+
+Nokia ISAM-style devices only offer the legacy `ssh-rsa` (RSA-SHA1) host key
+and require an interactive PTY + context-based CLI navigation. fncollect's
+interactive SSH session (`net.py`) handles prompt detection, paging and
+multi-token navigation. For these devices install the `net` extra with
+paramiko 2.x:
+
+```bash
+python -m pip install -e '.[net]'   # uses paramiko>=2.12
+```
 
 ## License
 
