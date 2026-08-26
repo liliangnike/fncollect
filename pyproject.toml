@@ -26,7 +26,6 @@ dependencies = [
 [project.optional-dependencies]
 net = [
     "paramiko>=2.12",  # 2.x required for legacy RSA-SHA1 (e.g. Nokia ISAM)
-    "aiossh>=0.16",
 ]
 dev = [
     "pytest>=8",
