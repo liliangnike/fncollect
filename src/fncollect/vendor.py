@@ -126,6 +126,51 @@ class Vendor(ABC):
     ) -> Device:
         """Dispatch to the concrete hardware class for the device."""
 
+    def cutthrough_provider(self) -> Any:
+        """Return this vendor's ONT cutthrough provider, or None if it does
+        not support gatewayed ONT sessions."""
+        return None
+
+    def create_ont(self, access: Any, session: Session) -> Device:
+        """Create the chipset-specialised ONT device for a cutthrough access."""
+        from fncollect.ont import ont_device_for
+
+        info = DeviceInfo(
+            vendor=self.name,
+            model=access.serial,
+            ip=access.ip,
+            role=DeviceRole.ONT,
+            session_type="ont",
+            extra={"chipset": access.chipset},
+        )
+        return ont_device_for(access.chipset, info, session)
+
+    def build_ont_cutthrough_session(self, olt: Device, target: Any) -> Session:
+        """Convenience: wiring for a gatewayed ONT session on this vendor.
+
+        Follows the precondition-gated flow: prepare OLT -> open ONT ->
+        run -> restore.
+        """
+        from fncollect.cutthrough import OntCutthroughSession
+
+        provider = self.cutthrough_provider()
+        inner_cls = self._ont_inner_session_class()
+        if provider is None or inner_cls is None:
+            raise NotImplementedError(
+                f"vendor {self.name!r} does not support ONT cutthrough"
+            )
+        endpoint = Endpoint(
+            hostname=target.serial, transport="ont", session_type="ont"
+        )
+        return OntCutthroughSession(
+            endpoint, olt, provider, target, inner_cls
+        )
+
+    def _ont_inner_session_class(self) -> type[Session] | None:
+        """Session class used for the reachable ONT transport once the OLT
+        is prepared. Subclasses that support cutthrough must override this."""
+        return None
+
     def session_types(self) -> dict[str, type[Session]]:
         """Map of session-type name to session class for this vendor."""
         return {}
