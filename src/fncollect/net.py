@@ -16,7 +16,10 @@ from __future__ import annotations
 import re
 import time
 
-import paramiko
+try:  # paramiko is an optional dependency (the `net` extra)
+    import paramiko
+except ImportError:  # pragma: no cover
+    paramiko = None  # type: ignore[assignment]
 
 from fncollect.sessions import CommandResult, Session
 
@@ -26,6 +29,8 @@ _PAGING = ("--more--", "--more (q to quit)", "press enter", "--more")
 
 def enable_legacy_ssh() -> None:
     """Re-enable legacy host-key/public-key algorithms where possible."""
+    if paramiko is None:  # pragma: no cover
+        raise ImportError("paramiko is required; install the 'net' extra")
     try:
         preferred = list(paramiko.Transport._preferred_keys)
         for algo in ("ssh-rsa", "ssh-dss"):
@@ -63,6 +68,8 @@ class InteractiveSshSession(Session):
         self._prompt_re = re.compile(r"(" + self.prompt_pattern + r")\s*$")
 
     def _connect_blocking(self) -> None:
+        if paramiko is None:  # pragma: no cover
+            raise ImportError("paramiko is required; install the 'net' extra")
         enable_legacy_ssh()
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

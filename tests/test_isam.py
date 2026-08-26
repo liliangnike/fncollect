@@ -1,6 +1,8 @@
 """Tests for the real interactive SSH session and ISAM vendor wiring."""
 
-import paramiko
+import pytest
+
+paramiko = pytest.importorskip("paramiko")
 
 from fncollect.config import VendorConfig, guess_project_root
 from fncollect.net import InteractiveSshSession, enable_legacy_ssh
