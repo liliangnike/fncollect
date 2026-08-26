@@ -35,6 +35,9 @@ class OntTarget:
     client_ip: str = ""
     lt: str = ""
     pon: str = ""
+    gpon_index: str = ""
+    username: str = ""
+    password: str = ""
     chipset: str = "generic"
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -64,6 +67,85 @@ class CutthroughProvider(ABC):
 
     async def restore(self, olt: Device, target: OntTarget) -> None:
         """Optionally undo OLT-side changes after the session closes (default: no-op)."""
+
+
+class DcpCutthroughProvider(CutthroughProvider):
+    """A cutthrough provider whose OLT-side prepare/restore are declarative DCPs.
+
+    The setup DCP is run on the OLT's TND (or provisioning) session. Steps are
+    parameterised from the ``OntTarget`` (variables such as gpon index, client
+    IP, debug vlan), which lets the entire OLT provisioning be described as
+    data (YAML) rather than code -- the ngalexx NT_TND-configuration analogue.
+    """
+
+    def __init__(
+        self,
+        tnd_device: Device,
+        run,
+        setup_dcp,
+        teardown_dcp=None,
+        ont_ip_var: str = "ont_session_ip",
+    ) -> None:
+        self._tnd = tnd_device
+        self._run = run
+        self._setup = setup_dcp
+        self._teardown = teardown_dcp
+        self.ont_ip_var = ont_ip_var
+        self.setup_results: dict | None = None
+
+    def _seed(self, target: OntTarget) -> dict[str, Any]:
+        return {
+            "ont_gpon_index": target.gpon_index,
+            "ont_serial": target.serial,
+            "client_ip": target.client_ip,
+            "ont_client_ip_spaces": target.client_ip.replace(".", " "),
+            "dbg_vlan": str(target.vlan),
+        }
+
+    async def prepare(self, olt: Device, target: OntTarget) -> OntAccess:
+        from fncollect.dcp import execute_dcp
+
+        self.setup_results = await execute_dcp(
+            self._setup,
+            self._tnd,
+            self._run,
+            seed_variables=self._seed(target),
+        )
+        return OntAccess(
+            ip=self._ont_ip(target),
+            username=target.username,
+            password=target.password,
+            serial=target.serial,
+            chipset=target.chipset,
+        )
+
+    def _ont_ip(self, target: OntTarget) -> str:
+        # Resolve the ONT management address from the setup DCP's extracted
+        # variables (recorded by the DCP engine), if present.
+        try:
+            import json
+
+            path = self._run.dir / "variables" / "variables.json"
+            if path.exists():
+                data = json.loads(path.read_text())
+                value = data.get(self.ont_ip_var) or data.get("ont_session_ip")
+                if value:
+                    return str(value)
+        except Exception:  # noqa: BLE001, S110 - fall back to client IP
+            pass
+        return target.client_ip
+
+    async def restore(self, olt: Device, target: OntTarget) -> None:
+        if self._teardown is None:
+            return
+        from fncollect.dcp import execute_dcp
+
+        await execute_dcp(
+            self._teardown,
+            self._tnd,
+            self._run,
+            seed_variables=self._seed(target),
+        )
 
 
 class OntCutthroughSession(Session):

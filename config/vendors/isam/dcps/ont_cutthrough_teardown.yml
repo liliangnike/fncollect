@@ -1,0 +1,14 @@
+name: isam_ont_cutthrough_teardown
+vendor: isam
+description: |
+  Undo OLT-side cutthrough provisioning after the ONT session closes.
+
+  NOTE: the TND commands below are illustrative placeholders; replace them
+  with the actual ISAM NT_TND CLI syntax for your release.
+parameters:
+  - {name: ont_gpon_index, type: string}
+steps:
+  - id: clear_client_ip
+    command: "ontSessionClientIpAddr 0 0 0 0"
+  - id: clear_provision
+    command: "ont-provision gpon {{ ont_gpon_index }} clear"
