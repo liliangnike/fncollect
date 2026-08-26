@@ -12,5 +12,9 @@ sessions:
     prompt: "TND[>#]"
 actions:
   - inventory
-  - log_collection
+  - run_commands
+commands:
+  inventory:
+    - "show version"
+    - "show alarms"
 dcps: []

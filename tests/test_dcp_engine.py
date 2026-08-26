@@ -1,19 +1,4 @@
-"""Base DCP engine tests (pass) and the meta-operations learning task.
-
-The tests marked ``xfail`` describe behaviour that is not yet implemented.
-They are YOUR assignment: implement ``loop``, ``wait`` and command
-templating in ``fncollect/dcp.py`` and flip ``strict=False`` to ``True`` /
-remove the marker once they pass.
-
-What to implement:
-  * ``wait``      : sleep before executing a step when ``step.wait`` is set.
-  * `loop`        : repeat a step over a list of context values; render
-                    ``{{ item }}`` in the command and derive a unique save
-                    path (e.g. append "-a", "-b") so artifacts don't collide.
-  * ``condition`` : gate a step on a boolean expression evaluated against the
-                    variable context (``step.condition``), using
-                    ``safe_eval`` from fncollect.variables.
-"""
+"""DCP engine tests: plain steps + meta-operations (wait, loop, condition)."""
 
 import asyncio
 import time
@@ -69,7 +54,6 @@ steps:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="learning task: wait not implemented", strict=False)
 async def test_wait_step_delays_execution(run_ctx):
     dcp = DcpDefinition(
         name="wait_dcp",
@@ -84,7 +68,6 @@ async def test_wait_step_delays_execution(run_ctx):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="learning task: loop+templating not implemented", strict=False)
 async def test_loop_step_expands_artifacts(run_ctx):
     dcp = DcpDefinition(
         name="loop_dcp",
@@ -102,11 +85,13 @@ async def test_loop_step_expands_artifacts(run_ctx):
     device = mock.create_device(mock.device_info())
     results = await execute_dcp(dcp, device, run_ctx)
     assert results["steps"][0]["ok"] is True
-    assert len(run_ctx._manifest["artifacts"]) == 2
+    assert len(results["steps"]) == 2
+    saved = [a for a in run_ctx._manifest["artifacts"] if a["kind"] == "dcp"]
+    paths = {a["path"] for a in saved}
+    assert {"ont/ont-1.txt", "ont/ont-2.txt"} <= paths
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="learning task: condition gating not implemented", strict=False)
 async def test_condition_step_skips_on_false_expression(run_ctx):
     dcp = DcpDefinition(
         name="cond_dcp",

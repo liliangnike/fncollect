@@ -6,12 +6,16 @@ a typed variable context: values are parsed from command output (regex
 extraction), computed as derived expressions, and substituted back into
 commands and save paths via ``{{ name }}`` templating.
 
-Meta-operations (loop, wait, skip) and per-step ``condition`` selection are
-partially implemented and are the learning exercises (see the failing tests).
+Meta-operations per step:
+  * ``skip``      -- skip the step entirely.
+  * ``condition`` -- gate the step on a boolean expression over the context.
+  * ``wait``      -- sleep before executing the step.
+  * ``loop``      -- repeat the step over a list of values (``{{ item }}``).
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -71,19 +75,6 @@ def parse_dcp(raw: str | dict[str, Any]) -> DcpDefinition:
     )
 
 
-def apply_meta_operations(
-    step: DcpStep, context: VariableContext
-) -> bool:
-    """Decide whether a step should run given its meta-operations.
-
-    Currently only evaluates ``skip``. Support for ``loop`` (repeat over a
-    list of context values), ``wait`` (delay before execution) and
-    ``condition`` (a boolean expression gating the step) is TODO -- see the
-    failing tests.
-    """
-    return not step.skip
-
-
 async def execute_dcp(
     dcp: DcpDefinition,
     device: Device,
@@ -102,52 +93,98 @@ async def execute_dcp(
     for idx, step in enumerate(dcp.steps):
         if idx >= max_steps:
             break
-        if not apply_meta_operations(step, context):
+        if not _should_run(step, context):
             results["steps"].append({"id": step.id, "skipped": True})
             continue
-        try:
-            rendered_command = render(step.command, context)
-            result = (
-                await device.exec_cmd(rendered_command)
-                if rendered_command
-                else None
-            )
-            if result is not None:
-                _apply_extractions(step, result.output, context)
-            _apply_derivations(dcp.derivations, context)
-
-            placed = None
-            if step.save and result is not None:
-                placed = run.write_text(
-                    Path(render(step.save, context)).parent,
-                    Path(render(step.save, context)).name,
-                    result.output,
-                    "dcp",
-                    {
-                        "dcp": dcp.name,
-                        "step": step.id,
-                        "variables": {
-                            k: v
-                            for k, v in context.snapshot().items()
-                            if _referenced(step, k)
-                        },
-                    },
-                )
-            results["steps"].append(
-                {
-                    "id": step.id,
-                    "ok": True,
-                    "artifact": str(placed) if placed else None,
-                }
-            )
-        except (CommandError, VariableError) as exc:
-            results["steps"].append({"id": step.id, "ok": False, "error": str(exc)})
+        await _maybe_wait(step)
+        for item in _loop_items(step, context):
+            if item is not None:
+                context.set("item", item, via="loop")
+            await _run_step(step, dcp, device, run, context, results)
 
     try:
         context.record_artifacts(dcp.name, run)
     except VariableError:
         pass
     return results
+
+
+def _should_run(step: DcpStep, context: VariableContext) -> bool:
+    """Evaluate the meta-operations that gate whether a step runs."""
+    if step.skip:
+        return False
+    if step.condition:
+        return bool(safe_eval(step.condition, context))
+    return True
+
+
+async def _maybe_wait(step: DcpStep) -> None:
+    if step.wait:
+        await asyncio.sleep(step.wait)
+
+
+def _loop_items(step: DcpStep, context: VariableContext) -> list:
+    """Resolve the loop iterable for a step, if any; else a single None item."""
+    if not step.loop:
+        return [None]
+    items = step.loop.get("items")
+    if isinstance(items, str) and context.has(items):
+        value = context.get(items)
+        return value if isinstance(value, list) else []
+    if isinstance(items, list):
+        return items
+    return []
+
+
+async def _run_step(
+    step: DcpStep,
+    dcp: DcpDefinition,
+    device: Device,
+    run: RunContext,
+    context: VariableContext,
+    results: dict[str, Any],
+) -> None:
+    try:
+        rendered_command = render(step.command, context)
+        result = (
+            await device.exec_cmd(rendered_command)
+            if rendered_command
+            else None
+        )
+        if result is not None:
+            _apply_extractions(step, result.output, context)
+        _apply_derivations(dcp.derivations, context)
+
+        placed = None
+        if step.save and result is not None:
+            save_path = render(step.save, context)
+            if save_path == step.save and step.loop and context.has("item"):
+                save_path = f"{save_path}-{context.get('item')}"
+            placed = run.write_text(
+                Path(save_path).parent,
+                Path(save_path).name,
+                result.output,
+                "dcp",
+                {
+                    "dcp": dcp.name,
+                    "step": step.id,
+                    "variables": {
+                        k: v
+                        for k, v in context.snapshot().items()
+                        if _referenced(step, k)
+                    },
+                },
+            )
+        results["steps"].append(
+            {
+                "id": step.id,
+                "ok": True,
+                "item": context.get("item") if step.loop else None,
+                "artifact": str(placed) if placed else None,
+            }
+        )
+    except (CommandError, VariableError) as exc:
+        results["steps"].append({"id": step.id, "ok": False, "error": str(exc)})
 
 
 def _apply_extractions(step: DcpStep, output: str, context: VariableContext) -> None:

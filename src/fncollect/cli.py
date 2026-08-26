@@ -28,8 +28,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--dcp", default=None, help="path to a DCP YAML file")
     run.add_argument("--config", default=None, help="path to config file")
 
+    collect = sub.add_parser("collect", help="run a semantic action across devices")
+    collect.add_argument("--vendor", default=None, help="vendor pack name")
+    collect.add_argument("--action", default="inventory", help="action name (inventory, run_commands)")
+    collect.add_argument("--devices", default=None, help="comma-separated device IPs")
+    collect.add_argument("--commands", default=None, help="comma-separated commands (for run_commands)")
+
+    sub.add_parser("interact", help="interactive guided menu (launch)")
     sub.add_parser("init", help="scaffold local user/ config tree")
     sub.add_parser("vendors", help="list registered vendor packs")
+
+    sub.add_parser("actions", help="list registered action types")
 
     parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
     return parser
@@ -48,6 +57,14 @@ def cmd_init(root: Path) -> int:
 def cmd_vendors() -> int:
     discover_vendors()
     for name in registry.names():
+        print(name)
+    return 0
+
+
+def cmd_actions() -> int:
+    from fncollect.actions import registry as action_registry
+
+    for name in action_registry.names():
         print(name)
     return 0
 
@@ -119,6 +136,57 @@ def _summarize(results, log) -> None:
             log.error("step %s failed: %s", step.get("id"), step.get("error"))
 
 
+def execute_collect(vendor_name: str, action: str, devices: str, commands: str | None = None) -> int:
+    """Shared entry: run an action across comma-separated device IPs."""
+    return asyncio.run(_collect(vendor_name, action, devices, commands))
+
+
+async def _collect(
+    vendor_name: str, action: str, devices: str, commands: str | None = None
+) -> int:
+    from fncollect.actions import action_work
+    from fncollect.engine import ConcurrentRunner
+    from fncollect.report import build_and_write
+
+    root = guess_project_root()
+    config = ToolConfig.load_defaults([root / "config" / "fncollect.yml"])
+    output_root = (root / config.run.output_dir).resolve()
+    run = RunContext(config.run, output_root, logger=build_logger(run_dir=None))
+    log = build_logger(run_dir=run.dir, config=config.logging)
+    run.logger = log
+
+    discover_vendors()
+    vendor_cls = registry.get(vendor_name)
+    vendor = vendor_cls()
+
+    ips = [d.strip() for d in devices.split(",") if d.strip()] or ["127.0.0.1"]
+    mock_devices = []
+    for ip in ips:
+        info = vendor.device_info()
+        info.ip = ip
+        mock_devices.append(vendor.create_device(info))
+
+    params = {"commands": commands.split(",")} if commands else None
+    runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
+    results = await runner.run(mock_devices, action_work(vendor, action), run, params)
+    summary = runner.summarize(results)
+    meta = {"vendor": vendor_name, "action": action, "devices": ips}
+    run.record_meta(meta)
+    reports = build_and_write(run, summary, meta)
+    manifest = run.finalize(meta)
+
+    for device in summary["devices"]:
+        status = "OK" if device["ok"] else "FAILED"
+        log.info("%s %s: %s", device["device"], device["action"], status)
+        if device.get("error"):
+            log.error("%s: %s", device["device"], device["error"])
+    print(f"\ncollect complete -> {run.dir}")
+    for name, path in reports.items():
+        print(f"  {name} -> {path}")
+    print(f"manifest      -> {manifest}")
+    return 0 if summary["failed"] == 0 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = guess_project_root()
@@ -126,9 +194,23 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(root)
     if args.command == "vendors":
         return cmd_vendors()
+    if args.command == "actions":
+        return cmd_actions()
+    if args.command == "interact":
+        from fncollect.menu import run_interactive
+
+        return run_interactive()
     if args.command == "run":
         try:
             return asyncio.run(cmd_run(args))
+        except KeyError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+    if args.command == "collect":
+        try:
+            return execute_collect(
+                args.vendor or "mock", args.action, args.devices or "", args.commands
+            )
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2

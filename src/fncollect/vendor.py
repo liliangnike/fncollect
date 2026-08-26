@@ -229,3 +229,11 @@ class Vendor(ABC):
 
     def registered_actions(self) -> list[str]:
         return []
+
+    def resolve_action_commands(self, action: str) -> list[str]:
+        """Return the command sequence for an action from the vendor's
+        declarative command catalog (falls back to an empty list)."""
+        config = self.vendor_config()
+        if not config:
+            return []
+        return list(config.commands.get(action, []))

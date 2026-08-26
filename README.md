@@ -4,38 +4,48 @@ A clean-room, multi-vendor **Fixed Network (FN) OLT/ONT log collector** and
 troubleshooting assistant. Written from scratch in Python (no proprietary
 source), designed to be extended to any FN vendor's product line.
 
-> Status: early scaffold / MVP.
-
 ## What it does
 
 fncollect connects to Fixed Network devices (OLT/ONT), runs declarative
-**Data Collection Procedures (DCPs)**, and organises the captured output into
-a timestamped run directory with a machine-readable `manifest.json`.
+**Data Collection Procedures (DCPs)** and **semantic actions** (inventory,
+on-demand commands), organises the captured output into a timestamped run
+directory with a machine-readable `manifest.json` plus human/CSV reports.
 
 ## Design goals
 
-- **Clean architecture** — abstract `Vendor` / `Device` / `Action` interfaces.
-- **Declarative DCPs** — collection procedures as YAML, no code changes to add
-  a new collection.
-- **Portable output** — every run has raw artifacts + a `manifest.json` for
-  downstream tooling and AI.
+- **Clean architecture** — abstract `Vendor` / `Session` / `Device` / `Action` contracts.
+- **Declarative DCPs** — collection procedures as YAML with variables, no code
+  changes to add a new collection.
+- **Configurable sessions** — per-session-type ports & prompts defined in YAML,
+  not hardcoded.
+- **Portable output** — every run has raw artifacts + `manifest.json` + reports
+  for downstream tooling and AI.
 - **Safe by default** — credentials redacted from logs; never logged.
-- **Extensible** — add a new vendor by dropping in a pack (see below).
+- **Extensible** — add a new vendor (and its hardware/ONT chipsets) as a pack.
 
 ## Package layout
 
 ```
-config/                 # committed defaults: fncollect.yml, vendor packs
+config/                 # committed defaults: fncollect.yml, vendor packs, DCPs
 src/fncollect/
-  cli.py                # entry point (fncollect run/init/vendors)
+  cli.py                # entry point (run / collect / interact / init / ...)
   config.py             # Pydantic config loading + validation
   logging_setup.py      # console + rolling file, secret redaction
   session_ctx.py        # per-run dir + manifest
   variables.py          # typed variable context, safe expressions, templating
+  sessions.py           # Endpoint + Session abstraction (port & prompt per type)
   vendor.py             # abstract Vendor/Device/Action contracts
-  dcp.py                # DCP engine + meta-ops (loop/wait/skip) [WIP]
+  ont.py                # ONT devices specialised by SoC chipset
+  cutthrough.py         # ONT cutthrough (OLT-gated access) workflow
+  dcp.py                # DCP engine + meta-ops (loop / wait / condition)
+  actions.py            # action registry + inventory / run_commands
+  engine.py             # concurrent multi-device runner
+  report.py             # summary.md / results.json / results.csv
+  discovery.py          # hardware-type auto-discovery (importlib)
+  menu.py               # interactive launch mode
   vendors/              # pluggable vendor packs
-    mock.py             # deterministic in-memory device (tests/demo)
+    mock/               # deterministic in-memory vendor (tests/demo)
+    nokia_fx/           # exemplar CLI-dialect pack
 tests/                  # pytest suite
 ```
 
@@ -44,9 +54,13 @@ tests/                  # pytest suite
 ```bash
 python -m pip install -e '.[dev]'
 python -m fncollect vendors          # list vendor packs
+python -m fncollect actions          # list available actions
 python -m fncollect run              # run with default mock vendor (no DCP)
 python -m fncollect run --vendor mock --dcp config/dcps/basic_collect.yml
+python -m fncollect collect --vendor mock --action inventory --devices 10.0.0.1
+python -m fncollect interact         # guided interactive menu
 python -m fncollect init             # scaffold user/ config tree
+python -m pytest                     # run the test suite
 ```
 
 ## Linux installation
@@ -138,11 +152,58 @@ Safety: only whitelisted string methods (`split`, `upper`, `lower`,
 `strip`, `replace`), arithmetic/comparison operators and context variables
 are allowed in expressions — no arbitrary code execution.
 
+### DCP meta-operations
+
+Each step can use meta-operations:
+
+```yaml
+steps:
+  - {id: s1, command: "show ver", skip: false}                  # skip a step
+  - {id: s2, command: "show ver", condition: "model == 'X'"}    # gate on an expression
+  - {id: s3, command: "show ver", wait: 1}                      # delay before running
+  - id: s4                                                      # repeat over items
+    command: "show ont {{ item }}"
+    save: "ont/{{ item }}.txt"
+    loop: {items: [ont-1, ont-2]}
+```
+
+## Sessions, ports & prompts
+
+Ports and prompts are **configurable per session type** via `vendor.yml`
+(no code change), falling back to the session class default:
+
+```yaml
+sessions:
+  cli: { port: 22,    prompt: "\\w+[>#]" }    # SSH console
+  tnd: { port: 11130, prompt: "TND[>#]" }     # SSH, different port + prompt
+```
+
+Precedence: explicit `endpoint.port` → vendor config → session class default.
+
+## ONT cutthrough & SoC chipsets
+
+An ONT is reached *through* the OLT: the OLT must be provisioned before the
+ONT session can open. `OntCutthroughSession.connect()` runs the OLT-side
+`prepare()` first (and `restore()` on close), enforcing the precondition.
+
+ONTs are specialised by their management SoC (`ont_device_for`):
+`realtek`/`mediatek`/`bcm`→ `RealtekOnt` / `MediaTekOnt` / `BroadcomOnt`, with
+a generic fallback.
+
 ## Terminals
 
-- `fncollect run` — collect from a device via a DCP.
-- `fncollect vendors` — list registered vendors.
+- `fncollect run` — run a DCP against one device.
+- `fncollect collect` — run a semantic action across many devices, concurrently:
+  ```bash
+  fncollect collect --vendor mock --action inventory --devices 10.0.0.1,10.0.0.2
+  fncollect collect --vendor mock --action run_commands --commands "show version,show alarms"
+  ```
+- `fncollect interact` — guided interactive menu (vendor → action → target).
+- `fncollect vendors` / `fncollect actions` — list what's available.
 - `fncollect init` — scaffold local `user/` config.
+
+Each run writes `manifest.json`, `app.log`, raw artifacts, and reports
+(`summary.md`, `results.json`, `results.csv`) under `fncollect_out/`.
 
 ## License
 

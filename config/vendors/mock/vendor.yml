@@ -12,5 +12,11 @@ sessions:
     port: 11130
 actions:
   - inventory
+  - run_commands
+commands:
+  inventory:
+    - "show version"
+    - "show alarms"
+    - "show ont summary"
 dcps:
   - config/dcps/basic_collect.yml
