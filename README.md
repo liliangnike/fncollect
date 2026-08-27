@@ -4,45 +4,63 @@ A clean-room, multi-vendor **Fixed Network (FN) OLT/ONT log collector** and
 troubleshooting assistant. Written from scratch in Python (no proprietary
 source), designed to be extended to any FN vendor's product line.
 
+> **New here? Read `docs/USER_GUIDE.md`** — it's written for people who do
+> *not* write code. To extend fncollect (or understand the YAML behind it),
+> see **`docs/EXTENDING.md`**.
+
 ## What it does
 
 fncollect connects to Fixed Network devices (OLT/ONT), runs declarative
 **Data Collection Procedures (DCPs)** and **semantic actions** (inventory,
-on-demand commands), organises the captured output into a timestamped run
-directory with a machine-readable `manifest.json` plus human/CSV reports.
+on-demand commands, ONT collection), organises the captured output into a
+timestamped run directory with a machine-readable `manifest.json` plus
+human/CSV reports.
+
+Everything you do on a device is defined as **YAML** (the "what"); a generic
+**runner** (the engine) executes it, and a small library of **value
+processors** turns raw output into exact values (the "how"). No code changes
+needed to add a procedure.
 
 ## Design goals
 
-- **Clean architecture** — abstract `Vendor` / `Session` / `Device` / `Action` contracts.
-- **Declarative DCPs** — collection procedures as YAML with variables, no code
-  changes to add a new collection.
-- **Configurable sessions** — per-session-type ports & prompts defined in YAML,
-  not hardcoded.
-- **Portable output** — every run has raw artifacts + `manifest.json` + reports
-  for downstream tooling and AI.
+- **Clean architecture** — abstract `Vendor` / `Session` / `Device` + a generic **runner** engine.
+- **Everything is YAML** — procedures (exec / get / configure), sessions, commands, probe — "what" not "how".
+- **Value processors** — regex / kv / grid / json / line turn raw output into exact values.
+- **Configurable sessions** — per-session-type ports & prompts defined in YAML, not hardcoded.
+- **Non-programmer friendly** — built-in procedures + `wizard` (auto-regex, no coding).
+- **Portable output** — every run has raw artifacts + `manifest.json` + reports.
 - **Safe by default** — credentials redacted from logs; never logged.
-- **Extensible** — add a new vendor (and its hardware/ONT chipsets) as a pack.
+- **Extensible** — add a vendor (and its hardware/ONT chipsets) as a pack.
 
 ## Package layout
 
 ```
 config/                 # committed defaults: fncollect.yml, vendor packs, DCPs
+docs/
+  USER_GUIDE.md         # for non-programmers  (start here)
+  EXTENDING.md          # for power users / integrators (YAML reference)
 src/fncollect/
-  cli.py                # entry point (run / collect / interact / init / ...)
+  cli.py                # entry point (run / collect / interact / wizard / ...)
   config.py             # Pydantic config loading + validation
   logging_setup.py      # console + rolling file, secret redaction
   session_ctx.py        # per-run dir + manifest
   variables.py          # typed variable context, safe expressions, templating
   sessions.py           # Endpoint + Session abstraction (port & prompt per type)
   vendor.py             # abstract Vendor/Device/Action contracts
+  processors.py         # value processors + auto-regex
+  operations.py         # generic exec / get / configure framework
+  progress.py           # tqdm progress bars (Linux-install style)
   ont.py                # ONT devices specialised by SoC chipset
   cutthrough.py         # ONT cutthrough (OLT-gated access) workflow
   dcp.py                # DCP engine + meta-ops (loop / wait / condition)
-  actions.py            # action registry + inventory / run_commands
+  actions.py            # action registry + inventory / run_commands / ont_inventory
   engine.py             # concurrent multi-device runner
   report.py             # summary.md / results.json / results.csv
+  ont.py                # ONT SoC chipsets (MediaTek / BCM / Realtek)
+  cutthrough.py         # ONT cutthrough (OLT-gated via setup/teardown DCPs)
   discovery.py          # hardware-type auto-discovery (importlib)
-  menu.py               # interactive launch mode
+  menu.py               # interactive launch mode (interact)
+  wizard.py             # interactive procedure builder + auto-regex
   vendors/              # pluggable vendor packs
     mock/               # deterministic in-memory vendor (tests/demo)
     nokia_fx/           # exemplar CLI-dialect pack
@@ -54,16 +72,28 @@ tests/                  # pytest suite
 ## Quick start
 
 ```bash
-python -m pip install -e '.[dev]'
-python -m fncollect vendors          # list vendor packs
-python -m fncollect actions          # list available actions
-python -m fncollect run              # run with default mock vendor (no DCP)
-python -m fncollect run --vendor mock --dcp config/dcps/basic_collect.yml
-python -m fncollect collect --vendor mock --action inventory --devices 10.0.0.1
-python -m fncollect interact         # guided interactive menu
-python -m fncollect init             # scaffold user/ config tree
+# install with device support
+python -m pip install -e '.[net]'
+
+# easiest path: guided menu (no coding)  ->  docs/USER_GUIDE.md
+python -m fncollect interact
+
+# discover what's available
+python -m fncollect vendors          # vendor packs
+python -m fncollect procedures --vendor isam   # built-in procedures
+python -m fncollect actions          # available actions
+
+# run a built-in procedure or an action across devices
+python -m fncollect run --vendor isam --procedure probe --device 10.52.142.74 --user admin --password ...
+python -m fncollect collect --vendor isam --action inventory --devices 10.52.142.74
+
+# build a custom procedure without writing regex
+python -m fncollect wizard --vendor isam
+
 python -m pytest                     # run the test suite
 ```
+Two documents worth reading: **`docs/USER_GUIDE.md`** (non-programmers) and
+**`docs/EXTENDING.md`** (integrators).
 
 ## Linux installation
 
@@ -192,22 +222,32 @@ ONTs are specialised by their management SoC (`ont_device_for`):
 `realtek`/`mediatek`/`bcm`→ `RealtekOnt` / `MediaTekOnt` / `BroadcomOnt`, with
 a generic fallback.
 
-## Terminals
+## Command reference
 
-- `fncollect run` — run a DCP against one device.
-- `fncollect collect` — run a semantic action across many devices, concurrently:
+- `fncollect interact` — guided interactive menu (easiest, no coding).
+- `fncollect run` — run a DCP/procedure against one device:
   ```bash
-  fncollect collect --vendor mock --action inventory --devices 10.0.0.1,10.0.0.2
-  fncollect collect --vendor isam --action inventory --devices 10.52.142.74 --user admin --password ...
+  fncollect run --vendor isam --procedure probe --device 10.52.142.74 --user admin --password ...
+  fncollect run --dcp my.yml ...
   ```
-  Credentials can come from `--user`/`--password` or environment
-  `FNCOLLECT_USER` / `FNCOLLECT_PASSWORD` (never logged).
-- `fncollect interact` — guided interactive menu (vendor → action → target).
+- `fncollect collect` — run an action across devices, concurrently:
+  ```bash
+  fncollect collect --vendor isam --action inventory --devices 10.0.0.1,10.0.0.2
+  fncollect collect --action ont_inventory --vendor isam --devices 10.52.142.74
+  ```
+- `fncollect wizard` — build a custom procedure without writing regex.
+- `fncollect procedures --vendor <name>` — list built-in procedures.
 - `fncollect vendors` / `fncollect actions` — list what's available.
 - `fncollect init` — scaffold local `user/` config.
 
+Credentials come from `--user`/`--password` or environment
+`FNCOLLECT_USER` / `FNCOLLECT_PASSWORD` (never logged).
+
 Each run writes `manifest.json`, `app.log`, raw artifacts, and reports
 (`summary.md`, `results.json`, `results.csv`) under `fncollect_out/`.
+
+For the full YAML reference (probe, procedures, value processors, ONT
+cutthrough, operations), see **`docs/EXTENDING.md`**.
 
 ## Real devices (legacy SSH)
 
