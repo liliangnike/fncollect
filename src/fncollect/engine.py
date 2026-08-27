@@ -46,9 +46,14 @@ class ConcurrentRunner:
         work: WorkFn,
         run: RunContext,
         params: dict[str, Any] | None = None,
+        progress=None,
     ) -> list[DeviceResult]:
+        device_list = list(devices)
         results: list[DeviceResult] = []
         semaphore = self._rating()
+        bar = None
+        if progress is not None:
+            bar = progress.steps("devices", len(device_list))
 
         async def _one(device: Device) -> DeviceResult:
             async with semaphore:
@@ -66,7 +71,10 @@ class ConcurrentRunner:
                     except Exception:  # noqa: BLE001
                         log.warning("disconnect failed for %s", device.info.ip)
 
-        results = await asyncio.gather(*(_one(d) for d in devices))
+        results = await asyncio.gather(*(_one(d) for d in device_list))
+        if bar:
+            bar.update(len(device_list))
+            bar.close()
         return list(results)
 
     @staticmethod

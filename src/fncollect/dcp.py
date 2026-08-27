@@ -89,17 +89,27 @@ async def execute_dcp(
         context.set(name, value, via="seed")
 
     results: dict[str, Any] = {"steps": []}
+    bar = None
+    if progress is not None:
+        bar = progress.steps(dcp.name, len(dcp.steps))
     for idx, step in enumerate(dcp.steps):
         if idx >= max_steps:
             break
         if not _should_run(step, context):
             results["steps"].append({"id": step.id, "skipped": True})
+            if bar:
+                bar.update(1)
             continue
         await _maybe_wait(step)
         for item in _loop_items(step, context):
             if item is not None:
                 context.set("item", item, via="loop")
             await _run_step(step, dcp, device, run, context, results)
+        if bar:
+            bar.update(1)
+
+    if bar:
+        bar.close()
 
     try:
         context.record_artifacts(dcp.name, run)

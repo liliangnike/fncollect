@@ -157,3 +157,30 @@ def _is_separator(line: str) -> bool:
     if not stripped:
         return True
     return bool(re.fullmatch(r"[\s|+=._~-]+", stripped)) and "-" in stripped
+
+
+def auto_regex(line: str, value: str) -> str | None:
+    """Generate a regex that captures ``value`` from ``line`` without
+    requiring the user to write regex by hand.
+
+    The captured value is placed in group 1. Returns None if ``value`` is not
+    found in ``line``.
+    """
+    idx = line.find(value)
+    if idx < 0:
+        return None
+    prefix = re.escape(line[:idx])
+    suffix = re.escape(line[idx + len(value):])
+    if value.isdigit():
+        group = r"(\d+)"
+    elif re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", value):
+        group = r"([0-9]+(?:\.[0-9]+)+)"
+    elif re.fullmatch(r"[A-Za-z0-9._:/-]+", value):
+        group = r"([A-Za-z0-9._:/-]+)"
+    else:
+        group = r"(.+?)"
+    pattern = prefix + group + suffix
+    match = re.search(pattern, line)
+    if match is not None and match.group(1) == value:
+        return pattern
+    return None

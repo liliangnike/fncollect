@@ -26,7 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--vendor", default=None, help="vendor pack name")
     run.add_argument("--device", default=None, help="device IP or SN")
     run.add_argument("--dcp", default=None, help="path to a DCP YAML file")
+    run.add_argument("--procedure", default=None, help="built-in procedure name for the vendor")
     run.add_argument("--config", default=None, help="path to config file")
+    run.add_argument("--user", default=None, help="login username")
+    run.add_argument("--password", default=None, help="login password")
+    run.add_argument("--no-progress", action="store_true", help="disable progress bars")
 
     collect = sub.add_parser("collect", help="run a semantic action across devices")
     collect.add_argument("--vendor", default=None, help="vendor pack name")
@@ -35,10 +39,21 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--commands", default=None, help="comma-separated commands (for run_commands)")
     collect.add_argument("--user", default=None, help="login username")
     collect.add_argument("--password", default=None, help="login password")
+    collect.add_argument("--no-progress", action="store_true", help="disable progress bars")
 
     sub.add_parser("interact", help="interactive guided menu (launch)")
     sub.add_parser("init", help="scaffold local user/ config tree")
     sub.add_parser("vendors", help="list registered vendor packs")
+
+    procedures = sub.add_parser("procedures", help="list built-in procedures for a vendor")
+    procedures.add_argument("--vendor", default=None, help="vendor pack name")
+
+    wizard = sub.add_parser("wizard", help="interactive procedure builder (no coding)")
+    wizard.add_argument("--vendor", default=None, help="vendor pack name")
+    wizard.add_argument("--out", default="user/procedures/custom.yml", help="output YAML procedure file")
+    wizard.add_argument("--device", default=None, help="device IP")
+    wizard.add_argument("--user", default=None, help="login username")
+    wizard.add_argument("--password", default=None, help="login password")
 
     sub.add_parser("actions", help="list registered action types")
 
@@ -59,6 +74,17 @@ def cmd_init(root: Path) -> int:
 def cmd_vendors() -> int:
     discover_vendors()
     for name in registry.names():
+        print(name)
+    return 0
+
+
+def cmd_procedures(args) -> int:
+    discover_vendors()
+    root = guess_project_root()
+    config = ToolConfig.load_defaults([root / "config" / "fncollect.yml"])
+    vendor_name = args.vendor or config.vendor
+    vendor = registry.get(vendor_name)()
+    for name in sorted(vendor.list_procedures()):
         print(name)
     return 0
 
@@ -90,21 +116,26 @@ async def cmd_run(args: argparse.Namespace) -> int:
     info = vendor.device_info()
     if args.vendor and args.device:
         info.ip = args.device
-    device = vendor.create_device(info)
+    device = vendor.create_device(info, credentials=_credentials(args))
 
     await device.connect()
     log.info("connected to %s (%s)", vendor_name, info.ip)
 
-    dcp_text = _load_dcp_text(args.dcp)
-    if dcp_text:
-        dcp = parse_dcp(dcp_text)
+    dcp = None
+    if args.procedure:
+        dcp = vendor.load_procedure(args.procedure)
+    elif args.dcp:
+        dcp = parse_dcp(_load_dcp_text(args.dcp))
+
+    if dcp is not None:
         log.info("running DCP %r with %d steps", dcp.name, len(dcp.steps))
-        results = await _run_dcp(dcp, run, device)
+        progress = _progress(args)
+        results = await _run_dcp(dcp, run, device, progress)
         run.record_meta({"dcp": dcp.name, "vendor": vendor_name})
         _summarize(results, log)
     else:
         results = {"steps": []}
-        log.info("no DCP provided; nothing to collect")
+        log.info("no DCP/procedure provided; nothing to collect")
 
     await device.disconnect()
     manifest = run.finalize({"vendor": vendor_name, "device": info.ip})
@@ -113,10 +144,10 @@ async def cmd_run(args: argparse.Namespace) -> int:
     return 0 if results["steps"] else 1
 
 
-async def _run_dcp(dcp, run, device):
+async def _run_dcp(dcp, run, device, progress=None):
     from fncollect.dcp import execute_dcp
 
-    return await execute_dcp(dcp, device, run)
+    return await execute_dcp(dcp, device, run, progress=progress)
 
 
 def _load_dcp_text(path: str | None) -> str | None:
@@ -144,9 +175,12 @@ def execute_collect(
     devices: str,
     commands: str | None = None,
     credentials: dict[str, str] | None = None,
+    no_progress: bool = False,
 ) -> int:
     """Shared entry: run an action across comma-separated device IPs."""
-    return asyncio.run(_collect(vendor_name, action, devices, commands, credentials))
+    return asyncio.run(
+        _collect(vendor_name, action, devices, commands, credentials, no_progress)
+    )
 
 
 async def _collect(
@@ -155,9 +189,11 @@ async def _collect(
     devices: str,
     commands: str | None = None,
     credentials: dict[str, str] | None = None,
+    no_progress: bool = False,
 ) -> int:
     from fncollect.actions import action_work
     from fncollect.engine import ConcurrentRunner
+    from fncollect.progress import Progress
     from fncollect.report import build_and_write
 
     root = guess_project_root()
@@ -182,7 +218,13 @@ async def _collect(
 
     params = {"commands": commands.split(",")} if commands else None
     runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
-    results = await runner.run(mock_devices, action_work(vendor, action), run, params)
+    results = await runner.run(
+        mock_devices,
+        action_work(vendor, action),
+        run,
+        params,
+        progress=(None if no_progress else Progress()),
+    )
     summary = runner.summarize(results)
     meta = {"vendor": vendor_name, "action": action, "devices": ips}
     run.record_meta(meta)
@@ -199,6 +241,12 @@ async def _collect(
         print(f"  {name} -> {path}")
     print(f"manifest      -> {manifest}")
     return 0 if summary["failed"] == 0 else 1
+
+
+def _progress(args) -> object | None:
+    from fncollect.progress import Progress
+
+    return None if getattr(args, "no_progress", False) else Progress()
 
 
 def _credentials(args) -> dict[str, str]:
@@ -222,8 +270,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(root)
     if args.command == "vendors":
         return cmd_vendors()
+    if args.command == "procedures":
+        return cmd_procedures(args)
     if args.command == "actions":
         return cmd_actions()
+    if args.command == "wizard":
+        from fncollect.wizard import build
+
+        return asyncio.run(build(args.vendor or "mock", args.out, _credentials(args)))
     if args.command == "interact":
         from fncollect.menu import run_interactive
 
@@ -242,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.devices or "",
                 args.commands,
                 _credentials(args),
+                args.no_progress,
             )
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)

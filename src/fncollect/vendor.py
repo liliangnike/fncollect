@@ -15,6 +15,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from fncollect.sessions import (  # noqa: F401  (re-exported)
@@ -319,6 +320,48 @@ class Vendor(ABC):
             return []
         return list(config.commands.get(action, []))
 
+    def dcp_dir(self) -> Path:
+        from pathlib import Path
+
+        from fncollect.config import guess_project_root
+
+        return Path(guess_project_root()) / "config" / "vendors" / self.name / "dcps"
+
+    def list_procedures(self) -> dict[str, Path]:
+        """Discover built-in YAML procedures for this vendor.
+
+        Returns {name: path} from the vendor's dcps/ directory, plus the
+        configured probe procedure. Names are the file stem (e.g. ``probe``).
+        """
+
+        procedures: dict[str, Path] = {}
+        dcp_dir = self.dcp_dir()
+        if dcp_dir.exists():
+            for path in sorted(dcp_dir.glob("*.yml")):
+                procedures[path.stem] = path
+            for path in sorted(dcp_dir.glob("*.yaml")):
+                procedures[path.stem] = path
+        probe, _ = self.probe_definition()
+        if probe is not None:
+            procedures.setdefault("probe", probe)
+        return procedures
+
+    def load_procedure(self, name: str):
+        """Load a built-in YAML procedure by name (case-insensitive)."""
+        from fncollect.dcp import DcpDefinition, parse_dcp
+
+        procedures = self.list_procedures()
+        key = _match_procedure(procedures, name)
+        if key is None:
+            raise KeyError(
+                f"unknown procedure {name!r} for vendor {self.name!r}; "
+                f"known: {sorted(procedures)}"
+            )
+        proc = procedures[key]
+        if isinstance(proc, DcpDefinition):
+            return proc
+        return parse_dcp(proc.read_text())
+
 
 def _read_probe_variables(run) -> dict[str, Any]:
     """Read the variable context persisted by the DCP engine for a run."""
@@ -331,3 +374,11 @@ def _read_probe_variables(run) -> dict[str, Any]:
     except Exception:  # noqa: BLE001, S110
         pass
     return {}
+
+
+def _match_procedure(procedures: dict[str, Path], name: str) -> str | None:
+    lowered = name.lower()
+    for key in procedures:
+        if key.lower() == lowered:
+            return key
+    return None
