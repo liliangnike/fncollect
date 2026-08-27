@@ -62,6 +62,7 @@ class VendorConfig(BaseModel):
     actions: list[str] = Field(default_factory=list)
     commands: dict[str, list[str]] = Field(default_factory=dict)
     dcps: list[str] = Field(default_factory=list)
+    probe: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def load(cls, name: str, project_root: Path) -> VendorConfig | None:

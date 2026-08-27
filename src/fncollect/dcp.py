@@ -16,7 +16,6 @@ Meta-operations per step:
 from __future__ import annotations
 
 import asyncio
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -188,16 +187,11 @@ async def _run_step(
 
 
 def _apply_extractions(step: DcpStep, output: str, context: VariableContext) -> None:
-    for spec in step.extract:
-        name = spec["name"]
-        match = re.search(spec["regex"], output)
-        if match:
-            group = spec.get("group", 1)
-            try:
-                value = match.group(group)
-            except IndexError:
-                value = match.group(0)
-            context.set(name, value, via="extract")
+    from fncollect.processors import extract_values
+
+    values = extract_values(output, step.extract, context)
+    for name, value in values.items():
+        context.set(name, value, via="extract")
 
 
 def _apply_derivations(

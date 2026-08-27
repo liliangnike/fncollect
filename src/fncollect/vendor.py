@@ -45,6 +45,9 @@ class DeviceInfo:
     hardware_type: str | None = None
     transport: str = "ssh"
     session_type: str | None = None
+    serial: str = ""
+    version: str = ""
+    chipset: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -59,6 +62,7 @@ class Device(ABC):
     def __init__(self, info: DeviceInfo, session: Session | None = None) -> None:
         self.info = info
         self._session = session
+        self.attributes: dict[str, Any] = dict(info.extra)
 
     @property
     def session(self) -> Session:
@@ -76,6 +80,26 @@ class Device(ABC):
 
     async def collect(self, command: str) -> CommandResult:
         return await self.exec_cmd(command)
+
+    async def get_values(self, command: str, extract: list[dict]) -> dict[str, Any]:
+        """Generic read: run a command, process its output, return collected
+        values keyed by name. ``extract`` items follow the value-processor
+        schema (see fncollect.processors)."""
+        from fncollect.processors import extract_values
+
+        result = await self.exec_cmd(command)
+        return extract_values(result.output, extract)
+
+    async def configure(self, command: str, verify: list[dict] | None = None) -> bool:
+        """Generic configure: run a command; optionally verify by re-reading
+        output against ``verify`` value specs. Returns whether it applied."""
+        result = await self.exec_cmd(command)
+        if not verify:
+            return result.exit_code == 0
+        from fncollect.processors import extract_values
+
+        values = extract_values(result.output, verify)
+        return bool(values)
 
     @abstractmethod
     async def disconnect(self) -> None:
@@ -236,6 +260,57 @@ class Vendor(ABC):
     def registered_actions(self) -> list[str]:
         return []
 
+    def probe_definition(self) -> tuple[Any, dict[str, str]]:
+        """Return (probe DCP, mappings) declared in the vendor config.
+
+        ``probe`` in vendor.yml points at a YAML procedure whose extracted
+        values are mapped onto DeviceInfo/attributes. Defaults to (None, {}).
+        Loaded from YAML when present, else None sentinel.
+        """
+        config = self.vendor_config()
+        if not config or not config.probe:
+            return None, {}
+        procedure = config.probe.get("procedure")
+        dcp = None
+        if procedure:
+            from pathlib import Path
+
+            from fncollect.config import guess_project_root
+            from fncollect.dcp import parse_dcp
+
+            path = Path(guess_project_root()) / "config" / "vendors" / self.name / "dcps" / Path(procedure).name
+            if path.exists():
+                dcp = parse_dcp(path.read_text())
+        return dcp, dict(config.probe.get("mappings", {}))
+
+    async def run_probe(self, device: Device, run) -> dict[str, str]:
+        """Run the vendor's probe procedure and map values onto the device.
+
+        Returns the mapped DeviceInfo/attribute summaries. This is the
+        generic device-initialization method: run probe commands -> process
+        output -> populate the abstract device.
+        """
+        mappings: dict[str, str]
+        dcp, mappings = self.probe_definition()
+        if dcp is None:
+            return {}
+        from fncollect.dcp import execute_dcp
+
+        seed = {}  # could be seeded from CLI/credentials if needed
+        await execute_dcp(dcp, device, run, seed_variables=seed)
+        # read the recorded variable context back
+        values = _read_probe_variables(run)
+        applied: dict[str, str] = {}
+        for var_name, target in mappings.items():
+            if var_name not in values:
+                continue
+            if target.startswith("attributes."):
+                device.attributes[target.split(".", 1)[1]] = values[var_name]
+            elif hasattr(device.info, target):
+                setattr(device.info, target, values[var_name])
+            applied[var_name] = target
+        return applied
+
     def resolve_action_commands(self, action: str) -> list[str]:
         """Return the command sequence for an action from the vendor's
         declarative command catalog (falls back to an empty list)."""
@@ -243,3 +318,16 @@ class Vendor(ABC):
         if not config:
             return []
         return list(config.commands.get(action, []))
+
+
+def _read_probe_variables(run) -> dict[str, Any]:
+    """Read the variable context persisted by the DCP engine for a run."""
+    import json
+
+    try:
+        path = run.dir / "variables" / "variables.json"
+        if path.exists():
+            return json.loads(path.read_text())
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return {}

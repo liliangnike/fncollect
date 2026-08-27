@@ -21,4 +21,9 @@ commands:
     - "show\nequipment\nont\nstatus"
     - "show\npon\nunprovision-onu"
     - "show\npon\nsfp-inventory"
+probe:
+  procedure: probe.yml
+  mappings:
+    sw_version: version
+    nt_board: attributes.nt_board
 dcps: []

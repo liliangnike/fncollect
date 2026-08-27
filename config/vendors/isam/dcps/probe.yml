@@ -1,0 +1,16 @@
+name: isam_probe
+vendor: isam
+description: Device initialization -- retrieve OLT system/basic info into the abstract device.
+steps:
+  - id: release
+    command: "show\nsoftware-mngt\nversion\nansi"
+    extract:
+      - {name: isam_feature_group, regex: "isam-feature-group : (R?\\S+)", group: 1}
+  - id: sw_version
+    command: "show\nsystem\nentry"
+    extract:
+      - {name: sw_version, regex: "mib-version : (\\S+)", group: 1}
+  - id: boards
+    command: "show\nequipment\nslot"
+    extract:
+      - {name: nt_board, parser: grid, header_row: 1, kind: cell, row: 1, column: actual-type}
