@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fncollect.config import ToolConfig, available_config_paths, guess_project_root
 from fncollect.dcp import parse_dcp
+from fncollect.device_lock import DeviceLockedError
 from fncollect.logging_setup import build_logger
 from fncollect.session_ctx import RunContext
 from fncollect.vendors.registry import discover_vendors, registry
@@ -24,13 +25,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="run a collection DCP against a device")
     run.add_argument("--vendor", default=None, help="vendor pack name")
-    run.add_argument("--device", default=None, help="device IP or SN")
+    run.add_argument("--device", default=None, help="device IP or SN (single device)")
+    run.add_argument("--devices", default=None, help="comma-separated device IPs (run the DCP concurrently)")
     run.add_argument("--dcp", default=None, help="path to a DCP YAML file")
     run.add_argument("--procedure", default=None, help="built-in procedure name for the vendor")
     run.add_argument("--config", default=None, help="path to config file")
     run.add_argument("--user", default=None, help="login username")
     run.add_argument("--password", default=None, help="login password")
     run.add_argument("--no-progress", action="store_true", help="disable progress bars")
+    run.add_argument("--no-lock", action="store_true", help="do not enforce the per-device single-task lock")
 
     collect = sub.add_parser("collect", help="run a semantic action across devices")
     collect.add_argument("--vendor", default=None, help="vendor pack name")
@@ -40,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--user", default=None, help="login username")
     collect.add_argument("--password", default=None, help="login password")
     collect.add_argument("--no-progress", action="store_true", help="disable progress bars")
+    collect.add_argument("--no-lock", action="store_true", help="do not enforce the per-device single-task lock")
 
     sub.add_parser("interact", help="interactive guided menu (launch)")
     sub.add_parser("init", help="scaffold local user/ config tree")
@@ -113,35 +117,113 @@ async def cmd_run(args: argparse.Namespace) -> int:
     vendor_cls = registry.get(vendor_name)
     vendor = vendor_cls()
 
-    info = vendor.device_info()
-    if args.vendor and args.device:
-        info.ip = args.device
-    device = vendor.create_device(info, credentials=_credentials(args))
-
-    await device.connect()
-    log.info("connected to %s (%s)", vendor_name, info.ip)
-
     dcp = None
     if args.procedure:
         dcp = vendor.load_procedure(args.procedure)
     elif args.dcp:
         dcp = parse_dcp(_load_dcp_text(args.dcp))
 
-    if dcp is not None:
-        log.info("running DCP %r with %d steps", dcp.name, len(dcp.steps))
-        progress = _progress(args)
-        results = await _run_dcp(dcp, run, device, progress)
-        run.record_meta({"dcp": dcp.name, "vendor": vendor_name})
-        _summarize(results, log)
-    else:
-        results = {"steps": []}
-        log.info("no DCP/procedure provided; nothing to collect")
+    # Multi-device DCP run: one DCP across comma-separated OLTs, concurrently.
+    device_str = getattr(args, "devices", None)
+    if dcp is not None and device_str:
+        return await _run_dcp_many(
+            args, root, config, run, log, vendor, dcp,
+            [d.strip() for d in device_str.split(",") if d.strip()],
+        )
 
-    await device.disconnect()
-    manifest = run.finalize({"vendor": vendor_name, "device": info.ip})
+    info = vendor.device_info()
+    ip = (args.device or "127.0.0.1").strip()
+    info.ip = ip
+    device = vendor.create_device(info, credentials=_credentials(args))
+
+    locks = _acquire_locks(root, config, [ip], getattr(args, "no_lock", False))
+    try:
+        await device.connect()
+        log.info("connected to %s (%s)", vendor_name, ip)
+
+        if dcp is not None:
+            log.info("running DCP %r with %d steps", dcp.name, len(dcp.steps))
+            progress = _progress(args)
+            results = await _run_dcp(dcp, run, device, progress)
+            run.record_meta({"dcp": dcp.name, "vendor": vendor_name})
+            _summarize(results, log)
+        else:
+            results = {"steps": []}
+            log.info("no DCP/procedure provided; nothing to collect")
+    finally:
+        _release_locks(locks)
+        await device.disconnect()
+
+    manifest = run.finalize({"vendor": vendor_name, "device": ip})
     print(f"\nrun complete -> {run.dir}")
     print(f"manifest    -> {manifest}")
     return 0 if results["steps"] else 1
+
+
+async def _run_dcp_many(args, root, config, run, log, vendor, dcp, ips: list[str]):
+    from fncollect.engine import ConcurrentRunner, DeviceResult
+    from fncollect.progress import Progress
+    from fncollect.report import build_and_write
+    from fncollect.session_ctx import sanitize
+
+    devices = [
+        vendor.create_device(_ip_info(vendor, ip), credentials=_credentials(args))
+        for ip in ips
+    ]
+    locks = _acquire_locks(root, config, ips, getattr(args, "no_lock", False))
+
+    def make_work(dcp, run, config):
+        from fncollect.config import RunConfig
+        from fncollect.dcp import execute_dcp
+
+        async def work(device, base_run, params):
+            base = Path(base_run.dir) / "devices"
+            dev_config = RunConfig(
+                output_dir=str(base),
+                session_dir_prefix=sanitize(device.info.ip),
+            )
+            dev_run = RunContext(dev_config, base, logger=base_run.logger)
+            results = await execute_dcp(dcp, device, dev_run, progress=None)
+            artifacts = [s.get("artifact") for s in results["steps"] if s.get("artifact")]
+            ok = bool(results["steps"]) and all(
+                s.get("ok") or s.get("skipped") for s in results["steps"]
+            )
+            return DeviceResult(
+                device=device.info.ip, ok=ok, action=dcp.name, artifacts=artifacts,
+                detail={"steps": results["steps"]},
+            )
+
+        return work
+
+    try:
+        runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
+        results = await runner.run(
+            devices,
+            make_work(dcp, run, config),
+            run,
+            progress=(None if getattr(args, "no_progress", False) else Progress()),
+        )
+    finally:
+        _release_locks(locks)
+
+    summary = runner.summarize(results)
+    meta = {"vendor": vendor.name, "dcp": dcp.name, "devices": ips}
+    run.record_meta(meta)
+    build_and_write(run, summary, meta)
+    manifest = run.finalize(meta)
+
+    for device in summary["devices"]:
+        status = "OK" if device["ok"] else "FAILED"
+        log.info("%s %s: %s", device["device"], device["action"], status)
+    print(f"\nrun complete (dcp {dcp.name} on {len(ips)} device(s)) -> {run.dir}")
+    print(f"manifest -> {manifest}")
+    return 0 if summary["failed"] == 0 else 1
+
+
+def _ip_info(vendor, ip):
+    info = vendor.device_info()
+    info.ip = ip.strip()
+    return info
 
 
 async def _run_dcp(dcp, run, device, progress=None):
@@ -176,10 +258,11 @@ def execute_collect(
     commands: str | None = None,
     credentials: dict[str, str] | None = None,
     no_progress: bool = False,
+    no_lock: bool = False,
 ) -> int:
     """Shared entry: run an action across comma-separated device IPs."""
     return asyncio.run(
-        _collect(vendor_name, action, devices, commands, credentials, no_progress)
+        _collect(vendor_name, action, devices, commands, credentials, no_progress, no_lock)
     )
 
 
@@ -190,6 +273,7 @@ async def _collect(
     commands: str | None = None,
     credentials: dict[str, str] | None = None,
     no_progress: bool = False,
+    no_lock: bool = False,
 ) -> int:
     from fncollect.actions import action_work
     from fncollect.engine import ConcurrentRunner
@@ -216,15 +300,19 @@ async def _collect(
             vendor.create_device(info, credentials=credentials)
         )
 
-    params = {"commands": commands.split(",")} if commands else None
-    runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
-    results = await runner.run(
-        mock_devices,
-        action_work(vendor, action),
-        run,
-        params,
-        progress=(None if no_progress else Progress()),
-    )
+    locks = _acquire_locks(root, config, ips, no_lock)
+    try:
+        params = {"commands": commands.split(",")} if commands else None
+        runner = ConcurrentRunner(config.concurrency.max_parallel_devices)
+        results = await runner.run(
+            mock_devices,
+            action_work(vendor, action),
+            run,
+            params,
+            progress=(None if no_progress else Progress()),
+        )
+    finally:
+        _release_locks(locks)
     summary = runner.summarize(results)
     meta = {"vendor": vendor_name, "action": action, "devices": ips}
     run.record_meta(meta)
@@ -241,6 +329,34 @@ async def _collect(
         print(f"  {name} -> {path}")
     print(f"manifest      -> {manifest}")
     return 0 if summary["failed"] == 0 else 1
+
+
+def _lock_dir(root: Path, config) -> Path:
+    return (root / config.run.output_dir) / "locks"
+
+
+def _acquire_locks(root: Path, config, devices: list[str], no_lock: bool = False) -> list:
+    """Acquire per-device locks; returns the locks held (or empty)."""
+    from fncollect.device_lock import DeviceLock, DeviceLockedError
+
+    if no_lock or not config.run.lock_enabled:
+        return []
+    locks = []
+    for ip in dict.fromkeys(devices):  # unique, preserve order
+        lock = DeviceLock(_lock_dir(root, config), ip)
+        try:
+            lock.acquire()
+        except DeviceLockedError:
+            for held in locks:
+                held.release()
+            raise
+        locks.append(lock)
+    return locks
+
+
+def _release_locks(locks: list) -> None:
+    for lock in locks:
+        lock.release()
 
 
 def _progress(args) -> object | None:
@@ -285,6 +401,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         try:
             return asyncio.run(cmd_run(args))
+        except DeviceLockedError as exc:
+            print(f"device busy: another task is already running on {exc}", file=sys.stderr)
+            return 3
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
@@ -297,10 +416,14 @@ def main(argv: list[str] | None = None) -> int:
                 args.commands,
                 _credentials(args),
                 args.no_progress,
+                args.no_lock,
             )
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
+        except DeviceLockedError as exc:
+            print(f"device busy: another task is already running on {exc}", file=sys.stderr)
+            return 3
     build_parser().print_help()
     return 2
 

@@ -34,6 +34,7 @@ class RunConfig(BaseModel):
     output_dir: str = "fncollect_out"
     session_dir_prefix: str = "run"
     retention: RetentionConfig = Field(default_factory=RetentionConfig)
+    lock_enabled: bool = True
 
 
 class ConcurrencyConfig(BaseModel):
