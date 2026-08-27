@@ -84,8 +84,8 @@ python -m fncollect procedures --vendor isam   # built-in procedures
 python -m fncollect actions          # available actions
 
 # run a built-in procedure or an action across devices
-python -m fncollect run --vendor isam --procedure probe --device 10.52.142.74 --user admin --password ...
-python -m fncollect collect --vendor isam --action inventory --devices 10.52.142.74
+python -m fncollect run --vendor isam --procedure probe --device 10.0.0.1 --user admin --password ...
+python -m fncollect collect --vendor isam --action inventory --devices 10.0.0.1
 
 # build a custom procedure without writing regex
 python -m fncollect wizard --vendor isam
@@ -227,13 +227,13 @@ a generic fallback.
 - `fncollect interact` — guided interactive menu (easiest, no coding).
 - `fncollect run` — run a DCP/procedure against one device:
   ```bash
-  fncollect run --vendor isam --procedure probe --device 10.52.142.74 --user admin --password ...
+  fncollect run --vendor isam --procedure probe --device 10.0.0.1 --user admin --password ...
   fncollect run --dcp my.yml ...
   ```
 - `fncollect collect` — run an action across devices, concurrently:
   ```bash
   fncollect collect --vendor isam --action inventory --devices 10.0.0.1,10.0.0.2
-  fncollect collect --action ont_inventory --vendor isam --devices 10.52.142.74
+  fncollect collect --action ont_inventory --vendor isam --devices 10.0.0.1
   ```
 - `fncollect wizard` — build a custom procedure without writing regex.
 - `fncollect procedures --vendor <name>` — list built-in procedures.

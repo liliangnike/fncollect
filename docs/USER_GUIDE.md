@@ -34,7 +34,7 @@ That's it.
 
 ### B. One command, built-in action
 ```bash
-fncollect collect --vendor isam --action inventory --devices 10.52.142.74
+fncollect collect --vendor isam --action inventory --devices 10.0.0.1
 ```
 - `--action` choices: `inventory`, `ont_inventory`, `run_commands`
 - a comma-separated list of device IPs runs them **in parallel**
@@ -42,7 +42,7 @@ fncollect collect --vendor isam --action inventory --devices 10.52.142.74
 ### C. A pre-built procedure by name
 ```bash
 fncollect procedures --vendor isam             # list what's built in
-fncollect run --vendor isam --procedure probe --device 10.52.142.74
+fncollect run --vendor isam --procedure probe --device 10.0.0.1
 ```
 Built-in procedures (`probe`, ones in the vendor's `dcps/` folder) run as-is —
 no setup on your side.
@@ -71,12 +71,12 @@ Open **`reports/summary.md`** to see a clean summary of what was collected.
 
 Provide them per-command:
 ```bash
-fncollect collect --vendor isam --action inventory --devices 10.52.142.74 \
-    --user isadmin --password '...'
+fncollect collect --vendor isam --action inventory --devices 10.0.0.1 \
+    --user <username> --password '<password>'
 ```
 or set them once in your environment (so they're not in your command history):
 ```bash
-export FNCOLLECT_USER=isadmin
+export FNCOLLECT_USER=<username>
 export FNCOLLECT_PASSWORD='...'
 ```
 Credentials are **never written to logs**.
