@@ -134,7 +134,7 @@ async def cmd_run(args: argparse.Namespace) -> int:
     info = vendor.device_info()
     ip = (args.device or "127.0.0.1").strip()
     info.ip = ip
-    device = vendor.create_device(info, credentials=_credentials(args))
+    device = vendor.create_device(info, credentials=_credentials(args.user, args.password, vendor_name))
 
     locks = _acquire_locks(root, config, [ip], getattr(args, "no_lock", False))
     try:
@@ -167,7 +167,7 @@ async def _run_dcp_many(args, root, config, run, log, vendor, dcp, ips: list[str
     from fncollect.session_ctx import sanitize
 
     devices = [
-        vendor.create_device(_ip_info(vendor, ip), credentials=_credentials(args))
+        vendor.create_device(_ip_info(vendor, ip), credentials=_credentials(args.user, args.password, vendor.name))
         for ip in ips
     ]
     locks = _acquire_locks(root, config, ips, getattr(args, "no_lock", False))
@@ -256,13 +256,14 @@ def execute_collect(
     action: str,
     devices: str,
     commands: str | None = None,
-    credentials: dict[str, str] | None = None,
+    user: str | None = None,
+    password: str | None = None,
     no_progress: bool = False,
     no_lock: bool = False,
 ) -> int:
     """Shared entry: run an action across comma-separated device IPs."""
     return asyncio.run(
-        _collect(vendor_name, action, devices, commands, credentials, no_progress, no_lock)
+        _collect(vendor_name, action, devices, commands, user, password, no_progress, no_lock)
     )
 
 
@@ -271,7 +272,8 @@ async def _collect(
     action: str,
     devices: str,
     commands: str | None = None,
-    credentials: dict[str, str] | None = None,
+    user: str | None = None,
+    password: str | None = None,
     no_progress: bool = False,
     no_lock: bool = False,
 ) -> int:
@@ -292,6 +294,7 @@ async def _collect(
     vendor = vendor_cls()
 
     ips = [d.strip() for d in devices.split(",") if d.strip()] or ["127.0.0.1"]
+    credentials = _credentials(user, password, vendor_name)
     mock_devices = []
     for ip in ips:
         info = vendor.device_info()
@@ -365,18 +368,54 @@ def _progress(args) -> object | None:
     return None if getattr(args, "no_progress", False) else Progress()
 
 
-def _credentials(args) -> dict[str, str]:
-    """Resolve login credentials from CLI flags or env, avoiding logs."""
+class CredentialsError(RuntimeError):
+    pass
+
+
+def _interactive() -> bool:
+    try:
+        return bool(getattr(sys.stdin, "isatty", lambda: False)())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _needs_credentials(vendor_name: str) -> bool:
+    # Real devices authenticate over SSH; the mock vendor does not.
+    return vendor_name and vendor_name != "mock"
+
+
+def _base_credentials(user: str | None, password: str | None) -> tuple[str | None, str | None]:
     import os
 
-    username = args.user or os.environ.get("FNCOLLECT_USER")
-    password = args.password or os.environ.get("FNCOLLECT_PASSWORD")
-    creds: dict[str, str] = {}
-    if username:
-        creds["username"] = username
-    if password:
-        creds["password"] = password
-    return creds
+    return (
+        user or os.environ.get("FNCOLLECT_USER"),
+        password or os.environ.get("FNCOLLECT_PASSWORD"),
+    )
+
+
+def _credentials(
+    user: str | None, password: str | None, vendor_name: str | None
+) -> dict[str, str]:
+    """Resolve credentials from flags/env; prompt interactively when needed.
+
+    Raises CredentialsError with a clear message if a real device needs
+    credentials and there is no interactive terminal to ask for them.
+    """
+    u, p = _base_credentials(user, password)
+    if _needs_credentials(vendor_name) and (not u or not p):
+        if not _interactive():
+            raise CredentialsError(
+                "device login credentials are missing for vendor "
+                f"{vendor_name!r}; provide --user/--password or set "
+                "FNCOLLECT_USER / FNCOLLECT_PASSWORD"
+            )
+        if not u:
+            u = input("Username: ").strip()
+        if not p:
+            import getpass
+
+            p = getpass.getpass("Password: ")
+    return {"username": u or "", "password": p or ""}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -393,7 +432,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "wizard":
         from fncollect.wizard import build
 
-        return asyncio.run(build(args.vendor or "mock", args.out, _credentials(args)))
+        return asyncio.run(
+            build(args.vendor or "mock", args.out,
+                  _credentials(args.user, args.password, args.vendor or "mock"))
+        )
     if args.command == "interact":
         from fncollect.menu import run_interactive
 
@@ -404,6 +446,9 @@ def main(argv: list[str] | None = None) -> int:
         except DeviceLockedError as exc:
             print(f"device busy: another task is already running on {exc}", file=sys.stderr)
             return 3
+        except CredentialsError as exc:
+            print(f"credentials error: {exc}", file=sys.stderr)
+            return 2
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
@@ -414,12 +459,16 @@ def main(argv: list[str] | None = None) -> int:
                 args.action,
                 args.devices or "",
                 args.commands,
-                _credentials(args),
+                args.user,
+                args.password,
                 args.no_progress,
                 args.no_lock,
             )
         except KeyError as exc:
             print(f"error: {exc}", file=sys.stderr)
+            return 2
+        except CredentialsError as exc:
+            print(f"credentials error: {exc}", file=sys.stderr)
             return 2
         except DeviceLockedError as exc:
             print(f"device busy: another task is already running on {exc}", file=sys.stderr)
