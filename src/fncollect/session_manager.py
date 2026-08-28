@@ -51,18 +51,14 @@ class SessionManager:
             self._connected.add(id(session))
 
     async def connect_all(self) -> None:
-        """Connect the active session (must succeed); try the rest lazily.
+        """Connect the active session (must succeed).
 
-        A session that cannot connect (e.g. a closed provisioning port) is not
-        fatal -- it is retried on demand the first time it is targeted.
+        Other sessions are connected lazily the first time they are targeted,
+        so a session that cannot connect (e.g. a closed provisioning port) only
+        fails if a procedure actually uses it -- it never delays or clutters a
+        run that only uses the active session.
         """
         await self._connect(self._current)
-        for alias in list(self._sessions):
-            if alias != self._current:
-                try:
-                    await self._connect(alias)
-                except Exception:  # noqa: BLE001 - non-default session
-                    self._connected.discard(id(self._sessions[alias]))
 
     async def exec_cmd(self, command: str, session: str | None = None) -> CommandResult:
         target = session or self._current

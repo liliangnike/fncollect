@@ -15,6 +15,15 @@ from __future__ import annotations
 
 import re
 import time
+import warnings
+
+# paramiko 2.x emits a harmless TripleDES deprecation warning on import with
+# recent cryptography; silence it so console output stays clean.
+warnings.filterwarnings(
+    "ignore",
+    message="TripleDES has been moved",
+    category=DeprecationWarning,
+)
 
 try:  # paramiko is an optional dependency (the `net` extra)
     import paramiko

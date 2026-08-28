@@ -12,9 +12,10 @@ class FakeSession:
     def __init__(self, tag: str) -> None:
         self.tag = tag
         self.commands: list[str] = []
+        self.connect_calls = 0
 
     async def connect(self) -> None:
-        pass
+        self.connect_calls += 1
 
     async def exec_cmd(self, command: str) -> CommandResult:
         self.commands.append(command)
@@ -87,3 +88,18 @@ async def test_step_session_targets_specific_session(run_ctx):
     await execute_dcp(dcp, device, run_ctx)
     assert tnd.commands == ["cmd-a"]
     assert cli.commands == ["cmd-b"]
+
+
+async def test_connect_all_only_connects_active_then_lazy():
+    cli = FakeSession("cli")
+    tnd = FakeSession("tnd")
+    manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
+
+    await manager.connect_all()
+    assert cli.connect_calls == 1
+    assert tnd.connect_calls == 0  # not eagerly opened
+
+    # targeting the other session connects it lazily
+    await manager.exec_cmd("x", session="tnd")
+    assert tnd.connect_calls == 1
+    assert tnd.commands == ["x"]
