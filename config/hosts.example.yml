@@ -1,0 +1,36 @@
+# -------- fncollect device inventory / bulk credentials --------
+# Copy this to user/hosts.yml (gitignored) and fill in your devices.
+# Credentials here are kept OUT of git.
+
+# DEFAULT CREDENTIALS: used for ANY device not listed below (no matching
+# IP / ONT serial). This is the "one default for all FN devices" option.
+default_credentials:
+  username: isadmin
+  # password: my-default-password
+
+# optional other shared defaults (vendor, etc.)
+defaults:
+  vendor: isam
+
+# per-device entries; a matching identifier overrides the defaults
+# (OLT by IP, ONT by serial number)
+hosts:
+  - name: OLT-1
+    ip: 10.0.0.1
+    vendor: isam
+    username: isadmin
+    password: "pass-for-olt-1"
+
+  - name: OLT-2
+    ip: 10.0.0.2
+    vendor: isam
+    username: isadmin
+    password: "pass-for-olt-2"
+
+  # ONTs are keyed by serial number, not IP
+  - name: ONT-1
+    serial: ALCLF84C9CA0
+    vendor: isam
+    role: ont
+    username: ontadmin
+    password: "pass-for-ont-1"

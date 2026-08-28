@@ -67,11 +67,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cmd_init(root: Path) -> int:
     user_dir = root / "user"
-    hosts = root / "config" / "hosts.example.yml"
+    user_dir.mkdir(parents=True, exist_ok=True)
     (user_dir / ".gitkeep").touch(exist_ok=True)
+    hosts = root / "user" / "hosts.yml"
     if not hosts.exists():
-        hosts.write_text("# Add your devices here, e.g.:\n# - name: olt-1\n#   ip: 10.0.0.1\n")
-    print(f"scaffolded user config tree at {user_dir}")
+        example = root / "config" / "hosts.example.yml"
+        if example.exists():
+            (root / "user" / "hosts.yml").write_text(example.read_text())
+    print(f"scaffolded user config tree at {user_dir} (edit user/hosts.yml for credentials)")
     return 0
 
 
@@ -134,7 +137,9 @@ async def cmd_run(args: argparse.Namespace) -> int:
     info = vendor.device_info()
     ip = (args.device or "127.0.0.1").strip()
     info.ip = ip
-    device = vendor.create_device(info, credentials=_credentials(args.user, args.password, vendor_name))
+    device = vendor.create_device(
+        info, credentials=_resolve_device_credentials(ip, vendor_name, args.user, args.password)
+    )
 
     locks = _acquire_locks(root, config, [ip], getattr(args, "no_lock", False))
     try:
@@ -167,7 +172,10 @@ async def _run_dcp_many(args, root, config, run, log, vendor, dcp, ips: list[str
     from fncollect.session_ctx import sanitize
 
     devices = [
-        vendor.create_device(_ip_info(vendor, ip), credentials=_credentials(args.user, args.password, vendor.name))
+        vendor.create_device(
+            _ip_info(vendor, ip),
+            credentials=_resolve_device_credentials(ip, vendor.name, args.user, args.password),
+        )
         for ip in ips
     ]
     locks = _acquire_locks(root, config, ips, getattr(args, "no_lock", False))
@@ -294,13 +302,15 @@ async def _collect(
     vendor = vendor_cls()
 
     ips = [d.strip() for d in devices.split(",") if d.strip()] or ["127.0.0.1"]
-    credentials = _credentials(user, password, vendor_name)
+    per_ip_creds = {
+        ip: _resolve_device_credentials(ip, vendor_name, user, password) for ip in ips
+    }
     mock_devices = []
     for ip in ips:
         info = vendor.device_info()
         info.ip = ip
         mock_devices.append(
-            vendor.create_device(info, credentials=credentials)
+            vendor.create_device(info, credentials=per_ip_creds[ip])
         )
 
     locks = _acquire_locks(root, config, ips, no_lock)
@@ -391,6 +401,50 @@ def _base_credentials(user: str | None, password: str | None) -> tuple[str | Non
         user or os.environ.get("FNCOLLECT_USER"),
         password or os.environ.get("FNCOLLECT_PASSWORD"),
     )
+
+
+def _resolve_device_credentials(
+    device_key: str,
+    vendor_name: str,
+    user: str | None = None,
+    password: str | None = None,
+) -> dict[str, str]:
+    """Resolve credentials for one device.
+
+    ``device_key`` is the device IP or ONT serial (or name). Precedence:
+    flag > matching host entry (user/hosts.yml) > hosts defaults >
+    environment > interactive prompt.
+    """
+    u, p = user, password
+    try:
+        from fncollect.config import HostsConfig
+
+        hosts = HostsConfig.load()
+        if hosts is not None:
+            merged = hosts.resolve(device_key, vendor_name)
+            u = u or merged.get("username")
+            p = p or merged.get("password")
+    except Exception:  # noqa: BLE001, S110 - a bad hosts file should not block
+        pass
+    u = u or None
+    p = p or None
+    fallback_u, fallback_p = _base_credentials(None, None)
+    u = u or fallback_u
+    p = p or fallback_p
+    if _needs_credentials(vendor_name) and (not u or not p):
+        if not _interactive():
+            raise CredentialsError(
+                f"device login credentials are missing for {device_key} (vendor "
+                f"{vendor_name!r}); add an entry to user/hosts.yml, or provide "
+                "--user/--password, or set FNCOLLECT_USER / FNCOLLECT_PASSWORD"
+            )
+        if not u:
+            u = input(f"Username for {device_key}: ").strip()
+        if not p:
+            import getpass
+
+            p = getpass.getpass(f"Password for {device_key}: ")
+    return {"username": u or "", "password": p or ""}
 
 
 def _credentials(

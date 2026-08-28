@@ -75,6 +75,64 @@ class VendorConfig(BaseModel):
         return cls.model_validate(data)
 
 
+class HostEntry(BaseModel):
+    """A single OLT/ONT device with (optionally) its own credentials.
+
+    A device is identified by ``ip`` or ``serial`` (for ONTs) or ``name``.
+    """
+
+    name: str = ""
+    ip: str = ""
+    serial: str = ""
+    vendor: str | None = None
+    role: str | None = None
+    session_type: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+
+class HostsConfig(BaseModel):
+    """Device inventory with credentials (user/hosts.yml, gitignored).
+
+    ``default_credentials`` (and ``defaults``) apply to every device; a
+    per-host ``hosts`` entry overrides for that device. A device is matched
+    by its ``ip``, ``serial`` (ONTs) or ``name``. If no host entry matches,
+    the default credentials are used -- so users can set one default for all
+    their FN devices and override per device as needed.
+    """
+
+    defaults: dict[str, Any] = Field(default_factory=dict)
+    default_credentials: dict[str, Any] = Field(default_factory=dict)
+    hosts: list[HostEntry] = Field(default_factory=list)
+
+    @classmethod
+    def load(cls, path: Path | None = None) -> HostsConfig | None:
+        if path is None:
+            path = guess_project_root() / "user" / "hosts.yml"
+        if not path.exists():
+            return None
+        data = yaml.safe_load(path.read_text()) or {}
+        return cls.model_validate(data)
+
+    def resolve(self, key: str, vendor: str | None = None) -> dict[str, Any]:
+        """Resolve merged settings (defaults + matching host) for a device.
+
+        ``key`` is the device's IP, ONT serial, or name. Devices not in the
+        inventory fall back to the default credentials.
+        """
+        merged: dict[str, Any] = dict(self.defaults)
+        merged.update(self.default_credentials or {})
+        for host in self.hosts:
+            if key in (host.ip, host.serial, host.name):
+                for field, value in host.model_dump().items():
+                    if value not in (None, ""):
+                        merged[field] = value
+                break
+        if vendor and not merged.get("vendor"):
+            merged["vendor"] = vendor
+        return merged
+
+
 class ToolConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     run: RunConfig = Field(default_factory=RunConfig)
