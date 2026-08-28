@@ -389,6 +389,18 @@ def _interactive() -> bool:
         return False
 
 
+def _masked_password(prompt: str) -> str:
+    """Prompt for a password, masking each typed character with '*'."""
+    try:
+        import pwinput
+
+        return pwinput.maskinput(prompt, mask="*")
+    except ImportError:  # pragma: no cover - pwinput is a hard dependency
+        import getpass
+
+        return getpass.getpass(prompt)
+
+
 def _needs_credentials(vendor_name: str) -> bool:
     # Real devices authenticate over SSH; the mock vendor does not.
     return vendor_name and vendor_name != "mock"
@@ -441,9 +453,7 @@ def _resolve_device_credentials(
         if not u:
             u = input(f"Username for {device_key}: ").strip()
         if not p:
-            import getpass
-
-            p = getpass.getpass(f"Password for {device_key}: ")
+            p = _masked_password(f"Password for {device_key}: ")
     return {"username": u or "", "password": p or ""}
 
 
@@ -466,9 +476,7 @@ def _credentials(
         if not u:
             u = input("Username: ").strip()
         if not p:
-            import getpass
-
-            p = getpass.getpass("Password: ")
+            p = _masked_password("Password: ")
     return {"username": u or "", "password": p or ""}
 
 

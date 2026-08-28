@@ -44,9 +44,7 @@ def test_prompts_when_interactive(monkeypatch):
     monkeypatch.delenv("FNCOLLECT_PASSWORD", raising=False)
     monkeypatch.setattr(cli, "_interactive", lambda: True)
     monkeypatch.setattr("builtins.input", lambda *a: "typeduser")
-    import getpass
-
-    monkeypatch.setattr(getpass, "getpass", lambda *a: "typedpass")
+    monkeypatch.setattr(cli, "_masked_password", lambda *a: "typedpass")
     assert cli._credentials(None, None, "isam") == {
         "username": "typeduser",
         "password": "typedpass",
