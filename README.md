@@ -4,10 +4,9 @@ A clean-room, multi-vendor **Fixed Network (FN) OLT/ONT log collector** and
 troubleshooting assistant. Written from scratch in Python (no proprietary
 source), designed to be extended to any FN vendor's product line.
 
-> **New here? Read `docs/USER_GUIDE.md`** — it's written for people who do
-> *not* write code. To extend fncollect (or understand the YAML behind it),
-> see **`docs/EXTENDING.md`**. To read the source code top-down, follow
-> **`docs/CODE_WALKTHROUGH.md`**.
+> **New here? 
+> Read `docs/USER_GUIDE.md`** — it's written for people who do *not* write code. 
+> To extend fncollect (or understand the YAML behind it), see **`docs/EXTENDING.md`**.
 
 ## What it does
 
@@ -40,7 +39,6 @@ config/                 # committed defaults: fncollect.yml, vendor packs, DCPs
 docs/
   USER_GUIDE.md         # for non-programmers  (start here)
   EXTENDING.md          # for power users / integrators (YAML reference)
-  CODE_WALKTHROUGH.md   # how to read the source code (top-down)
 src/fncollect/
   cli.py                # entry point (run / collect / interact / wizard / ...)
   config.py             # Pydantic config loading + validation
