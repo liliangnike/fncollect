@@ -14,8 +14,8 @@ See the **README** for full install steps. In short:
 ```bash
 pip install -e '.[net]'      # .net enables the device SSH libraries
 ```
-If your devices are older Nokia ISAMs, parametize **paramiko 2.x** (legacy
-SSH). The README covers this.
+Install as in the README. The `net` extra already provides the right
+(legacy-capable) SSH library for older Nokia ISAMs.
 
 ---
 

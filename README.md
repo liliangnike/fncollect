@@ -254,11 +254,14 @@ cutthrough, operations), see **`docs/EXTENDING.md`**.
 Nokia ISAM-style devices only offer the legacy `ssh-rsa` (RSA-SHA1) host key
 and require an interactive PTY + context-based CLI navigation. fncollect's
 interactive SSH session (`net.py`) handles prompt detection, paging and
-multi-token navigation. For these devices install the `net` extra with
-paramiko 2.x:
+multi-token navigation.
+
+The `net` extra installs **paramiko 2.x** (legacy RSA-SHA1 support is required
+to authenticate these devices; paramiko 3+/5 cannot verify the SHA-1
+signature):
 
 ```bash
-python -m pip install -e '.[net]'   # uses paramiko>=2.12
+python -m pip install -e '.[net]'   # provides paramiko>=2.12,<3
 ```
 
 ## License

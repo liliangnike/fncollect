@@ -27,6 +27,15 @@ _ANSI = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _PAGING = ("--more--", "--more (q to quit)", "press enter", "--more")
 
 
+def _paramiko_major() -> int:
+    if paramiko is None:
+        return 0
+    try:
+        return int(paramiko.__version__.split(".")[0])
+    except (AttributeError, ValueError):  # pragma: no cover
+        return 0
+
+
 def enable_legacy_ssh() -> None:
     """Re-enable legacy host-key/public-key algorithms where possible."""
     if paramiko is None:  # pragma: no cover
@@ -73,15 +82,24 @@ class InteractiveSshSession(Session):
         enable_legacy_ssh()
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(
-            hostname=self.endpoint.hostname,
-            port=self.endpoint.port,
-            username=self.endpoint.username,
-            password=self.endpoint.password,
-            timeout=25,
-            look_for_keys=False,
-            allow_agent=False,
-        )
+        try:
+            client.connect(
+                hostname=self.endpoint.hostname,
+                port=self.endpoint.port,
+                username=self.endpoint.username,
+                password=self.endpoint.password,
+                timeout=25,
+                look_for_keys=False,
+                allow_agent=False,
+            )
+        except paramiko.ssh_exception.SSHException as exc:
+            if _paramiko_major() >= 3:
+                raise RuntimeError(
+                    "This device uses legacy RSA-SHA1 SSH, which paramiko "
+                    f"v{paramiko.__version__} cannot authenticate. Install "
+                    "paramiko 2.x: 'pip install \"paramiko>=2,<3\"'."
+                ) from exc
+            raise
         self._client = client
         self._chan = client.invoke_shell()
 

@@ -25,7 +25,9 @@ dependencies = [
 
 [project.optional-dependencies]
 net = [
-    "paramiko>=2.12",  # 2.x required for legacy RSA-SHA1 (e.g. Nokia ISAM)
+    # 2.x is required for legacy RSA-SHA1 SSH on old Nokia ISAM devices;
+    # 3+/5 cannot verify the SHA-1 host-key signature.
+    "paramiko>=2.12,<3",
 ]
 dev = [
     "pytest>=8",
