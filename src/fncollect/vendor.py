@@ -82,6 +82,18 @@ class Device(ABC):
     async def collect(self, command: str) -> CommandResult:
         return await self.exec_cmd(command)
 
+    # --- multi-session support (overridden by BaseDevice when a manager
+    #     is attached). Defaults keep single-session devices working. ---
+
+    def sessions(self) -> list[str]:
+        return []
+
+    def switch_session(self, alias: str) -> None:
+        raise KeyError(f"no session {alias!r} on this device")
+
+    async def exec_cmd_with_session(self, session: str, command: str) -> CommandResult:
+        return await self.exec_cmd(command)
+
     async def get_values(self, command: str, extract: list[dict]) -> dict[str, Any]:
         """Generic read: run a command, process its output, return collected
         values keyed by name. ``extract`` items follow the value-processor
@@ -110,17 +122,43 @@ class Device(ABC):
 class BaseDevice(Device):
     """Default Device implementation that delegates to a session."""
 
-    def __init__(self, info: DeviceInfo, session: Session) -> None:
+    def __init__(
+        self, info: DeviceInfo, session: Session, session_manager=None
+    ) -> None:
         super().__init__(info, session)
         self.role = info.role
+        from fncollect.session_manager import SessionManager
+
+        self._manager: SessionManager | None = session_manager
 
     async def connect(self) -> None:
+        if self._manager is not None:
+            await self._manager.connect_all()
+            return
         await self.session.connect()
 
+    def sessions(self) -> list[str]:
+        return self._manager.aliases if self._manager else []
+
+    def switch_session(self, alias: str) -> None:
+        if self._manager is None:
+            raise KeyError(f"no session {alias!r} on this device")
+        self._manager.switch(alias)
+
     async def exec_cmd(self, command: str) -> CommandResult:
+        if self._manager is not None:
+            return await self._manager.exec_cmd(command)
+        return await self.session.exec_cmd(command)
+
+    async def exec_cmd_with_session(self, session: str, command: str) -> CommandResult:
+        if self._manager is not None:
+            return await self._manager.exec_cmd(command, session=session)
         return await self.session.exec_cmd(command)
 
     async def disconnect(self) -> None:
+        if self._manager is not None:
+            await self._manager.close_all()
+            return
         await self.session.close()
 
 
@@ -256,7 +294,38 @@ class Vendor(ABC):
                 password=cred.get("password"),
             )
         )
-        return self.create_hardware(info, session)
+        device = self.create_hardware(info, session)
+        # Multi-session devices (e.g. cli + tnd): attach a session manager so
+        # procedures can switch the active session.
+        if len(self.session_types()) >= 2 and isinstance(device, BaseDevice):
+            device._manager = self.session_manager(info, cred)
+        return device
+
+    def session_manager(
+        self, info: DeviceInfo, credentials: dict[str, str] | None = None
+    ) -> Any:
+        """Build a multi-session manager for a device with several session
+        types (e.g. cli + tnd), so a procedure can switch the active session.
+
+        Returns None when the vendor has only a single session type.
+        """
+        types = self.session_types()
+        if len(types) < 2:
+            return None
+        from fncollect.session_manager import SessionManager
+
+        cred = credentials or {}
+        sessions = {}
+        for name in types:
+            endpoint = Endpoint(
+                hostname=info.ip,
+                transport=info.transport,
+                session_type=name,
+                username=cred.get("username"),
+                password=cred.get("password"),
+            )
+            sessions[name] = self.create_session(endpoint)
+        return SessionManager(sessions, default=info.session_type)
 
     def registered_actions(self) -> list[str]:
         return []

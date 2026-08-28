@@ -46,6 +46,8 @@ class DcpStep:
     loop: dict[str, Any] | None = None
     wait: float | None = None
     skip: bool = False
+    session: str | None = None
+    switch: str | None = None
 
 
 @dataclass
@@ -154,12 +156,13 @@ async def _run_step(
     results: dict[str, Any],
 ) -> None:
     try:
-        rendered_command = render(step.command, context)
-        result = (
-            await device.exec_cmd(rendered_command)
-            if rendered_command
-            else None
-        )
+        if step.switch:
+            device.switch_session(step.switch)
+        command = render(step.command, context)
+        if step.session:
+            result = await device.exec_cmd_with_session(step.session, command)
+        else:
+            result = await device.exec_cmd(command) if command else None
         if result is not None:
             _apply_extractions(step, result.output, context)
         _apply_derivations(dcp.derivations, context)
