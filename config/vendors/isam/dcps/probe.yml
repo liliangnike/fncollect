@@ -3,14 +3,15 @@ vendor: isam
 description: Device initialization -- retrieve OLT system/basic info into the abstract device.
 steps:
   - id: release
-    command: "show\nsoftware-mngt\nversion\nansi"
+    command: "show software-mngt version ansi"
     extract:
       - {name: isam_feature_group, regex: "isam-feature-group : (R?\\S+)", group: 1}
-  - id: sw_version
-    command: "show\nsystem\nentry"
+      - {name: sw_version, regex: "R([0-9]+(?:\\.[0-9]+)+)", group: 1}
+  - id: system_entry
+    command: "show system entry"
     extract:
-      - {name: sw_version, regex: "mib-version : (\\S+)", group: 1}
+      - {name: mib_version, regex: "mib-version : (\\S+)", group: 1}
   - id: boards
-    command: "show\nequipment\nslot"
+    command: "show equipment slot"
     extract:
-      - {name: nt_board, parser: grid, header_row: 1, kind: cell, row: 1, column: actual-type}
+      - {name: nt_board, parser: grid, header_row: 0, kind: cell, row: 1, column: actual-type}

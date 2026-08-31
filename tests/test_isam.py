@@ -19,7 +19,7 @@ def test_enable_legacy_ssh_reenables_ssh_rsa():
 def test_isam_vendor_config_catalog():
     cfg = VendorConfig.load("isam", guess_project_root())
     assert cfg is not None
-    assert "show\nsystem\nentry" in cfg.commands["inventory"]
+    assert "show system entry" in cfg.commands["inventory"]
 
 
 def test_isam_device_uses_interactive_session():

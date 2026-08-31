@@ -14,13 +14,13 @@ actions:
   - run_commands
 commands:
   inventory:
-    - "show\nsystem\nentry"
-    - "show\nequipment\nshelf-summary"
-    - "show\nequipment\nslot"
+    - "show system entry"
+    - "show equipment shelf-summary"
+    - "show equipment slot"
   ont_inventory:
-    - "show\nequipment\nont\nstatus"
-    - "show\npon\nunprovision-onu"
-    - "show\npon\nsfp-inventory"
+    - "show equipment ont status"
+    - "show pon unprovision-onu"
+    - "show pon sfp-inventory"
 probe:
   procedure: probe.yml
   mappings:

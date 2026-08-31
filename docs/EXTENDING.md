@@ -39,8 +39,8 @@ sessions:                      # session types: different port + prompt
 actions: [inventory, ont_inventory, run_commands]
 commands:                      # command catalog -> what each action runs
   inventory:
-    - "show\nsystem\nentry"
-    - "show\nequipment\nslot"
+    - "show system entry"
+    - "show equipment slot"
 probe:                         # device-init: which procedure + how to map values
   procedure: probe.yml
   mappings:
@@ -51,8 +51,10 @@ probe:                         # device-init: which procedure + how to map value
 Key ideas:
 - **Per-session-type ports & prompts** (CLI on 22, NT_TND on 11130) — even
   over the same SSH transport.
-- Commands may be **multi-line** (`"show\nsystem\nentry"`) to express
-  context navigation on ISAM-style CLIs.
+- Commands are written **space-separated** (`"show system entry"`) exactly as
+  you'd type them on the device; the ISAM resolves the context navigation
+  itself. (Multi-line `\n` steps are still supported for devices that require
+  stepping token-by-token.)
 - `probe.mappings` copies extracted values into the abstract **device**.
 
 ---
@@ -71,13 +73,13 @@ derivations:                      # optional computed variables
   - {name: upper_model, from: [model], expr: "model.upper()"}
 steps:
   - id: release
-    command: "show\nsoftware-mngt\nversion\nansi"
+    command: "show software-mngt version ansi"
     extract:
       - {name: sw_version, parser: regex,
          regex: "R([0-9]+(?:\\.[0-9]+)+)", group: 1}
 
   - id: boards
-    command: "show\nequipment\nslot"
+    command: "show equipment slot"
     extract:
       - {name: slots, parser: grid, kind: count}
 
@@ -126,7 +128,7 @@ steps:
 Example:
 ```yaml
 - type: get
-  command: "show\nsoftware-mngt\nversion\nansi"
+  command: "show software-mngt version ansi"
   get: {extract: [{name: ver, parser: regex, regex: "R(.+)", group: 1}]}
 - type: configure
   configure: {commands: ["..."], verify: [{name: ok, parser: kv, key: status}]}
