@@ -58,6 +58,9 @@ class Progress:
             position=self._level,
             bar_format="{desc}",
             ncols=self.ncols,
+            mininterval=0,
+            miniters=1,
+            delay=0,
             disable=not self.enabled,
         )
 
@@ -86,6 +89,8 @@ class _Bar:
         self._tq = tq
         self._prog = prog
         self._desc = tq.desc or ""
+        # draw the initial 0% state immediately (not after the first update)
+        self._refresh()
 
     def _refresh(self) -> None:
         total = self._tq.total or 1
