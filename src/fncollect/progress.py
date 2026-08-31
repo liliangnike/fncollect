@@ -1,8 +1,9 @@
 """Progress bars for stages/steps/procedures/command executions.
 
-Built on ``tqdm`` and styled to look like a Linux package-installation
-progress bar: a fixed square-bracket bar with a percentage and a description
-of the current unit (stage -> procedure -> step -> command).
+Built on ``tqdm`` (for frame management / stacking) and styled to look like
+a Linux package-installation progress bar: a fixed square-bracket bar with a
+percentage that fills left-to-right with ``=`` and a guaranteed ``>`` tip at
+the leading edge (e.g. ``[======>        ] 33%``).
 
 Nested levels are rendered as stacked tqdm bars; inner bars collapse when
 finished so the outer stage/step bars remain visible, like a detailed
@@ -15,9 +16,20 @@ import sys
 
 from tqdm import tqdm
 
-# Linux-install-style bar: "[========      ] 33%" (empty at 0%, '=' fill left-to-right)
-BAR_FORMAT = "{desc:<38}{percentage:3.0f}%[{bar}]"
-ASCII = " >="
+BAR_WIDTH = 22
+DESC_WIDTH = 34
+
+
+def _render(desc: str, frac: float) -> str:
+    """Build the full line: desc + percentage + ``[======>     ]`` bar."""
+    if frac <= 0:
+        seg = " " * BAR_WIDTH
+    elif frac >= 1:
+        seg = "=" * BAR_WIDTH
+    else:
+        filled = int(frac * BAR_WIDTH)
+        seg = "=" * (filled - 1) + ">" + " " * (BAR_WIDTH - filled)
+    return f"{desc:<{DESC_WIDTH}}{frac * 100:3.0f}%[{seg}]"
 
 
 def _tty() -> bool:
@@ -44,8 +56,7 @@ class Progress:
             unit=unit,
             leave=leave,
             position=self._level,
-            bar_format=BAR_FORMAT,
-            ascii=ASCII,
+            bar_format="{desc}",
             ncols=self.ncols,
             disable=not self.enabled,
         )
@@ -74,14 +85,25 @@ class _Bar:
     def __init__(self, tq: tqdm, prog: Progress) -> None:
         self._tq = tq
         self._prog = prog
+        self._desc = tq.desc or ""
+
+    def _refresh(self) -> None:
+        total = self._tq.total or 1
+        frac = self._tq.n / total
+        self._tq.set_description_str(_render(self._desc, frac), refresh=True)
 
     def update(self, n: int = 1) -> None:
         self._tq.update(n)
+        self._refresh()
 
     def set_desc(self, text: str) -> None:
-        self._tq.set_description_str(text, refresh=True)
+        self._desc = text
+        self._refresh()
 
     def close(self) -> None:
+        # redraw once at full before closing, so the final state is correct
+        self._tq.n = self._tq.total
+        self._refresh()
         self._tq.close()
         if self.enabled and self._tq.leave is False:
             self._prog.down()
