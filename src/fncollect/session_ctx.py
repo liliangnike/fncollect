@@ -82,6 +82,24 @@ class RunContext:
         self.register_artifact(path, kind, metadata)
         return path
 
+    def append_session_log(
+        self, command: str, output: str, exit_code: int = 0
+    ) -> Path:
+        """Append one command and its output to the device session log.
+
+        Mirrors ngalexx's device-session log: every executed command and its
+        captured output is preserved for later inspection, regardless of how
+        the collection is driven (DCP engine, actions, ...).
+        """
+        path = self.dir / "device_session.log"
+        with path.open("a", encoding="utf-8", errors="replace") as handle:
+            handle.write(f">>> {command}\n")
+            if output and not output.endswith("\n"):
+                output = output + "\n"
+            handle.write(output)
+            handle.write(f"[exit {exit_code}]\n")
+        return path
+
     def finalize(self, meta: dict[str, Any] | None = None) -> Path:
         if meta:
             self._manifest.update(meta)

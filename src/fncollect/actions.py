@@ -84,6 +84,7 @@ class CommandBatchAction(Action):
                     ok=False,
                     error=f"{command!r} failed: {exc}",
                 )
+            run.append_session_log(command, result.output, getattr(result, "exit_code", 0))
             path = run.write_text(
                 Path(self.subdir),
                 _filename(command, idx=len(placed)),

@@ -164,6 +164,8 @@ async def _run_step(
         else:
             result = await device.exec_cmd(command) if command else None
         if result is not None:
+            run.append_session_log(command, result.output, getattr(result, "exit_code", 0))
+        if result is not None:
             _apply_extractions(step, result.output, context)
         _apply_derivations(dcp.derivations, context)
 
