@@ -15,9 +15,9 @@ import sys
 
 from tqdm import tqdm
 
-# Linux-install-style bar: "[=====>      ] 57%"
+# Linux-install-style bar: "[========      ] 33%" (empty at 0%, '=' fill left-to-right)
 BAR_FORMAT = "{desc:<38}{percentage:3.0f}%[{bar}]"
-ASCII = "=> "
+ASCII = " >="
 
 
 def _tty() -> bool:
