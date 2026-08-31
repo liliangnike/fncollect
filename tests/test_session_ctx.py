@@ -41,4 +41,4 @@ def test_session_log_per_session_type(run_ctx):
     assert (run_ctx.dir / "device_session_tnd.log").exists()
     assert (run_ctx.dir / "device_session.log").exists()
     cli = (run_ctx.dir / "device_session_cli.log").read_text()
-    assert ">>> cmd-a" in cli and "out-a" in cli and "[exit 0]" in cli
+    assert ">>> cmd-a" in cli and "out-a" in cli and "[status 0]" in cli

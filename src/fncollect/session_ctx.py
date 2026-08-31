@@ -106,7 +106,7 @@ class RunContext:
             if output and not output.endswith("\n"):
                 output = output + "\n"
             handle.write(output)
-            handle.write(f"[exit {exit_code}]\n")
+            handle.write(f"[status {exit_code}]\n")
         return path
 
     def finalize(self, meta: dict[str, Any] | None = None) -> Path:
