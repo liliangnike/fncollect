@@ -83,15 +83,24 @@ class RunContext:
         return path
 
     def append_session_log(
-        self, command: str, output: str, exit_code: int = 0
+        self,
+        command: str,
+        output: str,
+        session: str | None = None,
+        exit_code: int = 0,
     ) -> Path:
-        """Append one command and its output to the device session log.
+        """Append one command and its output to a session log file.
 
-        Mirrors ngalexx's device-session log: every executed command and its
-        captured output is preserved for later inspection, regardless of how
-        the collection is driven (DCP engine, actions, ...).
+        Mirrors ngalexx's device-session logs: every executed command and its
+        captured output is preserved, with one log file per session type
+        (e.g. ``device_session_cli.log`` for OLT CLI, ``device_session_tnd.log``
+        for NT_TND). Falls back to ``device_session.log`` when no session name
+        is known.
         """
-        path = self.dir / "device_session.log"
+        filename = "device_session.log"
+        if session:
+            filename = f"device_session_{sanitize(session)}.log"
+        path = self.dir / filename
         with path.open("a", encoding="utf-8", errors="replace") as handle:
             handle.write(f">>> {command}\n")
             if output and not output.endswith("\n"):

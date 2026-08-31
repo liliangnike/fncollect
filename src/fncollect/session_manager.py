@@ -63,7 +63,9 @@ class SessionManager:
     async def exec_cmd(self, command: str, session: str | None = None) -> CommandResult:
         target = session or self._current
         await self._connect(target)
-        return await self._sessions[target].exec_cmd(command)
+        result = await self._sessions[target].exec_cmd(command)
+        result.session = target
+        return result
 
     async def close_all(self, aliases: list[str] | None = None) -> None:
         targets = aliases or list(self._sessions)

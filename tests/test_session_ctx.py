@@ -31,3 +31,14 @@ def test_run_context_sanitizes_names():
     from fncollect.session_ctx import sanitize
 
     assert sanitize("a b/c!d") == "a_b_c_d"
+
+
+def test_session_log_per_session_type(run_ctx):
+    run_ctx.append_session_log("cmd-a", "out-a", session="cli")
+    run_ctx.append_session_log("cmd-b", "out-b", session="tnd")
+    run_ctx.append_session_log("cmd-c", "out-c", session=None)  # generic
+    assert (run_ctx.dir / "device_session_cli.log").exists()
+    assert (run_ctx.dir / "device_session_tnd.log").exists()
+    assert (run_ctx.dir / "device_session.log").exists()
+    cli = (run_ctx.dir / "device_session_cli.log").read_text()
+    assert ">>> cmd-a" in cli and "out-a" in cli and "[exit 0]" in cli

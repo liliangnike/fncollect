@@ -29,6 +29,7 @@ class CommandResult:
     output: str
     exit_code: int = 0
     duration_sec: float = 0.0
+    session: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

@@ -148,12 +148,18 @@ class BaseDevice(Device):
     async def exec_cmd(self, command: str) -> CommandResult:
         if self._manager is not None:
             return await self._manager.exec_cmd(command)
-        return await self.session.exec_cmd(command)
+        result = await self.session.exec_cmd(command)
+        if not result.session:
+            result.session = self.info.session_type or "default"
+        return result
 
     async def exec_cmd_with_session(self, session: str, command: str) -> CommandResult:
         if self._manager is not None:
             return await self._manager.exec_cmd(command, session=session)
-        return await self.session.exec_cmd(command)
+        result = await self.session.exec_cmd(command)
+        if not result.session:
+            result.session = session
+        return result
 
     async def disconnect(self) -> None:
         if self._manager is not None:
