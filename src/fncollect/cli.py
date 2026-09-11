@@ -254,9 +254,14 @@ def _summarize(results, log) -> None:
     skipped = sum(1 for s in results["steps"] if s.get("skipped"))
     failed = sum(1 for s in results["steps"] if s.get("error"))
     log.info("steps: ok=%d skipped=%d failed=%d", ok, skipped, failed)
+    fatal = None
     for step in results["steps"]:
         if step.get("error"):
+            if step.get("fatal"):
+                fatal = step.get("error")
             log.error("step %s failed: %s", step.get("id"), step.get("error"))
+    if results.get("aborted"):
+        log.error("procedure aborted: session could not be established -> %s", fatal or results["aborted"])
 
 
 def execute_collect(

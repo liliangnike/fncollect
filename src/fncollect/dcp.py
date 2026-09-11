@@ -16,6 +16,7 @@ Meta-operations per step:
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from typing import Any
 import yaml
 
 from fncollect.session_ctx import RunContext
+from fncollect.sessions import DeviceConnectionError
 from fncollect.variables import (
     Parameter,
     VariableContext,
@@ -33,6 +35,8 @@ from fncollect.variables import (
 from fncollect.vendor import Device
 
 STEP_META_OPS = ("loop", "wait", "skip", "condition")
+
+log = logging.getLogger("fncollect.dcp")
 
 
 @dataclass
@@ -109,10 +113,25 @@ async def execute_dcp(
                 bar.update(1)
             continue
         await _maybe_wait(step)
-        for item in _loop_items(step, context):
-            if item is not None:
-                context.set("item", item, via="loop")
-            await _run_step(step, dcp, device, run, context, results)
+        try:
+            for item in _loop_items(step, context):
+                if item is not None:
+                    context.set("item", item, via="loop")
+                await _run_step(step, dcp, device, run, context, results)
+        except DeviceConnectionError as exc:
+            # A session could not be established (e.g. provisioning port
+            # closed). Running the remaining commands on it would only repeat
+            # the same connect failure, so abort the procedure here instead.
+            remaining = len(dcp.steps) - (idx + 1)
+            log.error(
+                "aborting %r: session could not be established (%s); "
+                "skipping %d remaining step(s)",
+                dcp.name, exc, remaining,
+            )
+            results["aborted"] = str(exc)
+            for _ in range(remaining):
+                results["steps"].append({"id": None, "skipped": True})
+            break
         if bar:
             bar.update(1)
 
@@ -211,6 +230,14 @@ async def _run_step(
                 "artifact": str(placed) if placed else None,
             }
         )
+    except DeviceConnectionError as exc:
+        # A session could not be established. This is fatal for the procedure
+        # (every later command on this session would fail the same way), so
+        # record the step and let execute_dcp abort the remaining steps.
+        results["steps"].append(
+            {"id": step.id, "ok": False, "error": str(exc), "fatal": True}
+        )
+        raise
     except Exception as exc:  # noqa: BLE001 - per-step resilience: a failing
         # command or an unreachable session (e.g. TND) must not abort the
         # whole collection; it is recorded and the run continues.

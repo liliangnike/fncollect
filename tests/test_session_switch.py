@@ -6,7 +6,7 @@ import pytest
 from fncollect.context import Context
 from fncollect.dcp import DcpDefinition, DcpStep, execute_dcp
 from fncollect.session_manager import SessionManager
-from fncollect.sessions import CommandResult
+from fncollect.sessions import CommandResult, DeviceConnectionError
 
 
 class FakeSession:
@@ -120,14 +120,41 @@ async def test_unreachable_session_fails_fast_after_first_attempt():
     tnd = BadSession("tnd")
     manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
 
-    # first targeting tries connect and fails
-    with pytest.raises(TimeoutError):
+    # first targeting tries connect and fails with a typed connection error
+    with pytest.raises(DeviceConnectionError):
         await manager.exec_cmd("a", session="tnd")
     assert tnd.connect_calls == 1
-    # subsequent targeting fails fast (no retry connect)
-    with pytest.raises(ConnectionError):
+    # subsequent targeting fails fast with the same typed error (no retry connect)
+    with pytest.raises(DeviceConnectionError):
         await manager.exec_cmd("b", session="tnd")
     assert tnd.connect_calls == 1  # still only one connect attempt
+
+
+async def test_dcp_aborts_on_unreachable_session(run_ctx):
+    class BadSession(FakeSession):
+        async def connect(self) -> None:
+            self.connect_calls += 1
+            raise TimeoutError("no banner")
+
+    cli = FakeSession("cli")
+    tnd = BadSession("tnd")
+    manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
+    device = MultiDevice(manager)
+
+    dcp = DcpDefinition(
+        name="abort_dcp", vendor="mock",
+        steps=[
+            DcpStep(id="a", command="cmd-a"),                      # cli (ok)
+            DcpStep(id="b", command="cmd-b", session="tnd"),       # tnd connect fails
+            DcpStep(id="c", command="cmd-c", session="tnd"),       # must NOT run
+            DcpStep(id="d", command="cmd-d", session="tnd"),       # must NOT run
+        ],
+    )
+    results = await execute_dcp(dcp, device, run_ctx)
+    assert results["aborted"] == "no banner"
+    assert {s["id"] for s in results["steps"] if s.get("error")} == {"b"}
+    assert tnd.connect_calls == 1   # connected once, never retried
+    assert tnd.commands == []       # no command ever reached TND
 
 
 async def test_exec_target_navigates_to_lt_and_back():

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fncollect.sessions import CommandResult
+from fncollect.sessions import CommandResult, DeviceConnectionError
 
 
 class SessionManager:
@@ -76,17 +76,20 @@ class SessionManager:
 
     async def _connect(self, alias: str) -> None:
         if alias in self._dead:
-            raise ConnectionError(self._dead[alias])
+            raise DeviceConnectionError(self._dead[alias])
         session = self._sessions[alias]
         if id(session) not in self._connected:
             try:
                 await session.connect()
                 self._connected.add(id(session))
+            except DeviceConnectionError as exc:
+                self._dead[alias] = str(exc)
+                raise
             except Exception as exc:
                 # remember the failure so later commands on this session fail
                 # fast instead of retrying a slow connect each time.
                 self._dead[alias] = str(exc)
-                raise
+                raise DeviceConnectionError(str(exc)) from exc
 
     async def connect_all(self) -> None:
         """Connect the active session (must succeed).
