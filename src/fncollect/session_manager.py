@@ -27,6 +27,7 @@ class SessionManager:
         self._sessions = sessions
         self._current = default if default in sessions else next(iter(sessions))
         self._connected: set[int] = set()
+        self._dead: dict[str, str] = {}
 
     @property
     def aliases(self) -> list[str]:
@@ -45,18 +46,25 @@ class SessionManager:
         self._current = alias
 
     async def _connect(self, alias: str) -> None:
+        if alias in self._dead:
+            raise ConnectionError(self._dead[alias])
         session = self._sessions[alias]
         if id(session) not in self._connected:
-            await session.connect()
-            self._connected.add(id(session))
+            try:
+                await session.connect()
+                self._connected.add(id(session))
+            except Exception as exc:
+                # remember the failure so later commands on this session fail
+                # fast instead of retrying a slow connect each time.
+                self._dead[alias] = str(exc)
+                raise
 
     async def connect_all(self) -> None:
         """Connect the active session (must succeed).
 
-        Other sessions are connected lazily the first time they are targeted,
-        so a session that cannot connect (e.g. a closed provisioning port) only
-        fails if a procedure actually uses it -- it never delays or clutters a
-        run that only uses the active session.
+        Other sessions are connected lazily the first time they are targeted;
+        if a session cannot connect it is marked dead and later commands on it
+        fail fast (they never delay or clutter the run's active session).
         """
         await self._connect(self._current)
 

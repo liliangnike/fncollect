@@ -1,52 +1,383 @@
 name: isam_default_collect
 vendor: isam
 description: |
-  Nokia ISAM (7360/7362) OLT shelf default collection -- baseline read-only
-  troubleshooting logs run on the OLT CLI session. Scope follows the
-  NGALEXX ISAM GENERIC/COMMON default-collection command set (sntp, software,
-  equipment, transceivers, config, alarms). Outputs are saved under
-  default_collect/.
+  Nokia ISAM (7360/7362) OLT SHELF default collection -- runs all three legs:
+    - OLT CLI GENERIC/COMMON (session: cli)
+    - NT_TND GENERIC/COMMON (session: tnd)
+    - LT_TND GENERIC/COMMON (session: tnd, per enabled LT)
+  Scope follows NGALEXX ISAM default collection (OLT_CLI/NT_TND/LT_TND).
+parameters:
+  - {name: db_running_container, type: string, default: "container_default"}
 steps:
-  - id: sntp
+  - id: s01
+    session: cli
     command: "show sntp"
-    save: "default_collect/system/sntp.txt"
-
-  - id: oswp
+    save: "default_collect/olt_cli/01_show_sntp.txt"
+  - id: s02
+    session: cli
     command: "show software-mngt oswp"
-    save: "default_collect/software/oswp.txt"
-
-  - id: equipment_temperature
+    save: "default_collect/olt_cli/02_show_software_mngt_oswp.txt"
+  - id: s03
+    session: cli
     command: "show equipment temperature"
-    save: "default_collect/equipment/temperature.txt"
-
-  - id: transceiver_inventory
+    save: "default_collect/olt_cli/03_show_equipment_temperature.txt"
+  - id: s04
+    session: cli
     command: "show equipment transceiver-inventory detail"
-    save: "default_collect/equipment/transceiver-inventory.txt"
-
-  - id: sfp_diagnostics
+    save: "default_collect/olt_cli/04_show_equipment_transceiver_inven.txt"
+  - id: s05
+    session: cli
     command: "show equipment diagnostics sfp detail"
-    save: "default_collect/equipment/sfp-diagnostics.txt"
-
-  - id: config_generic_pon
+    save: "default_collect/olt_cli/05_show_equipment_diagnostics_sfp_d.txt"
+  - id: s06
+    session: cli
     command: "info configure generic-pon"
-    save: "default_collect/config/generic-pon.txt"
-
-  - id: config_pon
+    save: "default_collect/olt_cli/06_info_configure_generic_pon.txt"
+  - id: s07
+    session: cli
     command: "info configure pon"
-    save: "default_collect/config/pon.txt"
-
-  - id: alarm_current_table
+    save: "default_collect/olt_cli/07_info_configure_pon.txt"
+  - id: s08
+    session: cli
     command: "show alarm current table"
-    save: "default_collect/alarm/current-table.txt"
-
-  - id: alarm_current_olt
+    save: "default_collect/olt_cli/08_show_alarm_current_table.txt"
+  - id: s09
+    session: cli
     command: "show alarm current olt-gen"
-    save: "default_collect/alarm/current-olt-gen.txt"
-
-  - id: alarm_delta_critical
+    save: "default_collect/olt_cli/09_show_alarm_current_olt_gen.txt"
+  - id: s10
+    session: cli
     command: "show alarm delta-log critical"
-    save: "default_collect/alarm/delta-critical.txt"
-
-  - id: alarm_delta_major
+    save: "default_collect/olt_cli/10_show_alarm_delta_log_critical.txt"
+  - id: s11
+    session: cli
     command: "show alarm delta-log major"
-    save: "default_collect/alarm/delta-major.txt"
+    save: "default_collect/olt_cli/11_show_alarm_delta_log_major.txt"
+  - id: s12
+    session: tnd
+    command: "login list"
+    save: "default_collect/nt_tnd/12_login_list.txt"
+  - id: s13
+    session: tnd
+    command: "eqpt getBoardRip {{lt_id}}"
+    save: "default_collect/nt_tnd/13_eqpt_getBoardRip_lt_id_.txt"
+  - id: s14
+    session: tnd
+    command: "memm free_mem"
+    save: "default_collect/nt_tnd/14_memm_free_mem.txt"
+  - id: s15
+    session: tnd
+    command: "krnl cpul_core_show_load"
+    save: "default_collect/nt_tnd/15_krnl_cpul_core_show_load.txt"
+  - id: s16
+    session: tnd
+    command: "syst getMib"
+    save: "default_collect/nt_tnd/16_syst_getMib.txt"
+  - id: s17
+    session: tnd
+    command: "alrm dar"
+    save: "default_collect/nt_tnd/17_alrm_dar.txt"
+  - id: s18
+    session: tnd
+    command: "alrm dt all"
+    save: "default_collect/nt_tnd/18_alrm_dt_all.txt"
+  - id: s19
+    session: tnd
+    command: "cmd buildVersion"
+    save: "default_collect/nt_tnd/19_cmd_buildVersion.txt"
+  - id: s20
+    session: tnd
+    command: "clk clk_states"
+    save: "default_collect/nt_tnd/20_clk_clk_states.txt"
+  - id: s21
+    session: tnd
+    command: "clk active_clk"
+    save: "default_collect/nt_tnd/21_clk_active_clk.txt"
+  - id: s22
+    session: tnd
+    command: "clk clocksInfo"
+    save: "default_collect/nt_tnd/22_clk_clocksInfo.txt"
+  - id: s23
+    session: tnd
+    command: "clk show_ssm"
+    save: "default_collect/nt_tnd/23_clk_show_ssm.txt"
+  - id: s24
+    session: tnd
+    command: "dbg show_print"
+    save: "default_collect/nt_tnd/24_dbg_show_print.txt"
+  - id: s25
+    session: tnd
+    command: "dbg qt"
+    save: "default_collect/nt_tnd/25_dbg_qt.txt"
+  - id: s26
+    session: tnd
+    command: "dbg qq"
+    save: "default_collect/nt_tnd/26_dbg_qq.txt"
+  - id: s27
+    session: tnd
+    command: "dbg qs"
+    save: "default_collect/nt_tnd/27_dbg_qs.txt"
+  - id: s28
+    session: tnd
+    command: "dbg ss"
+    save: "default_collect/nt_tnd/28_dbg_ss.txt"
+  - id: s29
+    session: tnd
+    command: "dbg qvt"
+    save: "default_collect/nt_tnd/29_dbg_qvt.txt"
+  - id: s30
+    session: tnd
+    command: "dbg rvt RPRT self"
+    save: "default_collect/nt_tnd/30_dbg_rvt_RPRT_self.txt"
+  - id: s31
+    session: tnd
+    command: "dbg rvt NPRT self"
+    save: "default_collect/nt_tnd/31_dbg_rvt_NPRT_self.txt"
+  - id: s32
+    session: tnd
+    command: "dbg rvt EPRT self"
+    save: "default_collect/nt_tnd/32_dbg_rvt_EPRT_self.txt"
+  - id: s33
+    session: tnd
+    command: "dump /Dbase/SwMgnt.ini"
+    save: "default_collect/nt_tnd/33_dump_Dbase_SwMgnt_ini.txt"
+  - id: s34
+    session: tnd
+    command: "dump {{db_running_container}}/Ipd/config.cfg"
+    save: "default_collect/nt_tnd/34_dump_db_running_container_Ipd_co.txt"
+  - id: s35
+    session: tnd
+    command: "dump /var/log/diagnostic"
+    save: "default_collect/nt_tnd/35_dump_var_log_diagnostic.txt"
+  - id: s36
+    session: tnd
+    command: "dump /var/log/auth_def.log"
+    save: "default_collect/nt_tnd/36_dump_var_log_auth_def_log.txt"
+  - id: s37
+    session: tnd
+    command: "dump /var/crashlog/thisNtCr.log"
+    save: "default_collect/nt_tnd/37_dump_var_crashlog_thisNtCr_log.txt"
+  - id: s38
+    session: tnd
+    command: "dir /"
+    save: "default_collect/nt_tnd/38_dir_.txt"
+  - id: s39
+    session: tnd
+    command: "dir /var/"
+    save: "default_collect/nt_tnd/39_dir_var_.txt"
+  - id: s40
+    session: tnd
+    command: "dir /var/log"
+    save: "default_collect/nt_tnd/40_dir_var_log.txt"
+  - id: s41
+    session: tnd
+    command: "dir /var/cmd"
+    save: "default_collect/nt_tnd/41_dir_var_cmd.txt"
+  - id: s42
+    session: tnd
+    command: "dir /var/bsnap"
+    save: "default_collect/nt_tnd/42_dir_var_bsnap.txt"
+  - id: s43
+    session: tnd
+    command: "dir /var/sessTbl"
+    save: "default_collect/nt_tnd/43_dir_var_sessTbl.txt"
+  - id: s44
+    session: tnd
+    command: "dir /var/pmv"
+    save: "default_collect/nt_tnd/44_dir_var_pmv.txt"
+  - id: s45
+    session: tnd
+    command: "dir /var/pmd"
+    save: "default_collect/nt_tnd/45_dir_var_pmd.txt"
+  - id: s46
+    session: tnd
+    command: "dir /var/cmd"
+    save: "default_collect/nt_tnd/46_dir_var_cmd.txt"
+  - id: s47
+    session: tnd
+    command: "dir /var/cmd/nt_sftp"
+    save: "default_collect/nt_tnd/47_dir_var_cmd_nt_sftp.txt"
+  - id: s48
+    session: tnd
+    command: "dir /data/"
+    save: "default_collect/nt_tnd/48_dir_data_.txt"
+  - id: s49
+    session: tnd
+    command: "dir /data/IPDR"
+    save: "default_collect/nt_tnd/49_dir_data_IPDR.txt"
+  - id: s50
+    session: tnd
+    command: "dir /data/err_nta"
+    save: "default_collect/nt_tnd/50_dir_data_err_nta.txt"
+  - id: s51
+    session: tnd
+    command: "dir /data/err_ntb"
+    save: "default_collect/nt_tnd/51_dir_data_err_ntb.txt"
+  - id: s52
+    session: tnd
+    command: "dir /data/err_lts"
+    save: "default_collect/nt_tnd/52_dir_data_err_lts.txt"
+  - id: s53
+    session: tnd
+    command: "dir /data/syslog"
+    save: "default_collect/nt_tnd/53_dir_data_syslog.txt"
+  - id: s54
+    session: tnd
+    command: "dir /data/config"
+    save: "default_collect/nt_tnd/54_dir_data_config.txt"
+  - id: s55
+    session: tnd
+    command: "dir /Sw"
+    save: "default_collect/nt_tnd/55_dir_Sw.txt"
+  - id: s56
+    session: tnd
+    command: "err stats"
+    save: "default_collect/nt_tnd/56_err_stats.txt"
+  - id: s57
+    session: tnd
+    command: "err getunr"
+    save: "default_collect/nt_tnd/57_err_getunr.txt"
+  - id: s58
+    session: tnd
+    command: "err printCAB"
+    save: "default_collect/nt_tnd/58_err_printCAB.txt"
+  - id: s59
+    session: tnd
+    command: "inic showStates"
+    save: "default_collect/nt_tnd/59_inic_showStates.txt"
+  - id: s60
+    session: tnd
+    command: "lxmg GetLanxStatus"
+    save: "default_collect/nt_tnd/60_lxmg_GetLanxStatus.txt"
+  - id: s61
+    session: tnd
+    command: "pelo get_reset_counter"
+    save: "default_collect/nt_tnd/61_pelo_get_reset_counter.txt"
+  - id: s62
+    session: tnd
+    command: "pelo get_delete_level"
+    save: "default_collect/nt_tnd/62_pelo_get_delete_level.txt"
+  - id: s63
+    session: tnd
+    command: "pelo get_asamSysStatus"
+    save: "default_collect/nt_tnd/63_pelo_get_asamSysStatus.txt"
+  - id: s64
+    session: tnd
+    command: "prot display"
+    save: "default_collect/nt_tnd/64_prot_display.txt"
+  - id: s65
+    session: tnd
+    command: "sock list"
+    save: "default_collect/nt_tnd/65_sock_list.txt"
+  - id: s66
+    session: tnd
+    command: "swoloi states"
+    save: "default_collect/nt_tnd/66_swoloi_states.txt"
+  - id: s67
+    session: tnd
+    command: "temp getTemperature"
+    save: "default_collect/nt_tnd/67_temp_getTemperature.txt"
+  - id: s68
+    session: tnd
+    command: "version"
+    save: "default_collect/nt_tnd/68_version.txt"
+  - id: s69
+    session: tnd
+    command: "xapi time"
+    save: "default_collect/nt_tnd/69_xapi_time.txt"
+  - id: s70
+    session: tnd
+    command: "linux cat /proc/interrupts"
+    save: "default_collect/nt_tnd/70_linux_cat_proc_interrupts.txt"
+  - id: s71
+    session: tnd
+    command: "linux df -h"
+    save: "default_collect/nt_tnd/71_linux_df_h.txt"
+  - id: s72
+    session: tnd
+    command: "linux free -m"
+    save: "default_collect/nt_tnd/72_linux_free_m.txt"
+  - id: s73
+    session: tnd
+    command: "linux cat /proc/meminfo"
+    save: "default_collect/nt_tnd/73_linux_cat_proc_meminfo.txt"
+  - id: s74
+    session: tnd
+    command: "linux cat /proc/vmstat"
+    save: "default_collect/nt_tnd/74_linux_cat_proc_vmstat.txt"
+  - id: s75
+    session: tnd
+    command: "linux mpstat -A"
+    save: "default_collect/nt_tnd/75_linux_mpstat_A.txt"
+  - id: s76
+    session: tnd
+    command: "linux top -Hn 1"
+    save: "default_collect/nt_tnd/76_linux_top_Hn_1.txt"
+  - id: s77
+    session: tnd
+    command: "linux top -n 1"
+    save: "default_collect/nt_tnd/77_linux_top_n_1.txt"
+  - id: s78
+    session: tnd
+    command: "memm free_mem"
+    save: "default_collect/lt_tnd/78_memm_free_mem.txt"
+  - id: s79
+    session: tnd
+    command: "krnl cpul_core_show_load"
+    save: "default_collect/lt_tnd/79_krnl_cpul_core_show_load.txt"
+  - id: s80
+    session: tnd
+    command: "cmd buildVersion"
+    save: "default_collect/lt_tnd/80_cmd_buildVersion.txt"
+  - id: s81
+    session: tnd
+    command: "version"
+    save: "default_collect/lt_tnd/81_version.txt"
+  - id: s82
+    session: tnd
+    command: "xapi time"
+    save: "default_collect/lt_tnd/82_xapi_time.txt"
+  - id: s83
+    session: tnd
+    command: "linux df -h"
+    save: "default_collect/lt_tnd/83_linux_df_h.txt"
+  - id: s84
+    session: tnd
+    command: "linux free -m"
+    save: "default_collect/lt_tnd/84_linux_free_m.txt"
+  - id: s85
+    session: tnd
+    command: "linux cat /proc/meminfo"
+    save: "default_collect/lt_tnd/85_linux_cat_proc_meminfo.txt"
+  - id: s86
+    session: tnd
+    command: "linux cat /proc/vmstat"
+    save: "default_collect/lt_tnd/86_linux_cat_proc_vmstat.txt"
+  - id: s87
+    session: tnd
+    command: "linux mpstat -A"
+    save: "default_collect/lt_tnd/87_linux_mpstat_A.txt"
+  - id: s88
+    session: tnd
+    command: "linux top -Hn 1"
+    save: "default_collect/lt_tnd/88_linux_top_Hn_1.txt"
+  - id: s89
+    session: tnd
+    command: "linux top -n 1"
+    save: "default_collect/lt_tnd/89_linux_top_n_1.txt"
+  - id: s90
+    session: tnd
+    command: "linux cat /mnt/reboot_info/reboot_info"
+    save: "default_collect/lt_tnd/90_linux_cat_mnt_reboot_info_reboot.txt"
+  - id: s91
+    session: tnd
+    command: "linux cat /proc/interrupts"
+    save: "default_collect/lt_tnd/91_linux_cat_proc_interrupts.txt"
+  - id: s92
+    session: tnd
+    command: "inic showStartupTimes"
+    save: "default_collect/lt_tnd/92_inic_showStartupTimes.txt"
+  - id: s93
+    session: tnd
+    command: "inic showStates"
+    save: "default_collect/lt_tnd/93_inic_showStates.txt"

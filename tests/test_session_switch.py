@@ -103,3 +103,23 @@ async def test_connect_all_only_connects_active_then_lazy():
     await manager.exec_cmd("x", session="tnd")
     assert tnd.connect_calls == 1
     assert tnd.commands == ["x"]
+
+
+async def test_unreachable_session_fails_fast_after_first_attempt():
+    class BadSession(FakeSession):
+        async def connect(self) -> None:
+            self.connect_calls += 1
+            raise TimeoutError("no banner")
+
+    cli = FakeSession("cli")
+    tnd = BadSession("tnd")
+    manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
+
+    # first targeting tries connect and fails
+    with pytest.raises(TimeoutError):
+        await manager.exec_cmd("a", session="tnd")
+    assert tnd.connect_calls == 1
+    # subsequent targeting fails fast (no retry connect)
+    with pytest.raises(ConnectionError):
+        await manager.exec_cmd("b", session="tnd")
+    assert tnd.connect_calls == 1  # still only one connect attempt

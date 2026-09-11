@@ -30,7 +30,7 @@ from fncollect.variables import (
     render,
     safe_eval,
 )
-from fncollect.vendor import CommandError, Device
+from fncollect.vendor import Device
 
 STEP_META_OPS = ("loop", "wait", "skip", "condition")
 
@@ -202,7 +202,9 @@ async def _run_step(
                 "artifact": str(placed) if placed else None,
             }
         )
-    except (CommandError, VariableError) as exc:
+    except Exception as exc:  # noqa: BLE001 - per-step resilience: a failing
+        # command or an unreachable session (e.g. TND) must not abort the
+        # whole collection; it is recorded and the run continues.
         results["steps"].append({"id": step.id, "ok": False, "error": str(exc)})
 
 
