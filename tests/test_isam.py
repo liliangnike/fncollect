@@ -35,7 +35,7 @@ def test_default_collect_is_full_shelf():
     dcp = parse_dcp(p.read_text())
     assert dcp.name == "isam_default_collect"
     assert dcp.log_dir == "default_collect"
-    assert len(dcp.steps) == 93
+    assert len(dcp.steps) == 92
     sessions = {s.session for s in dcp.steps}
     assert sessions == {"cli", "tnd"}  # OLT CLI + NT/LT TND legs
 

@@ -5,268 +5,264 @@ description: |
 parameters:
   - {name: db_running_container, type: string}
 steps:
-  - id: s1
+  - id: s01
     session: tnd
     command: "login list"
     save: "default_collect/tnd/01_login_list.txt"
-  - id: s2
-    session: tnd
-    command: "eqpt getBoardRip {{lt_id}}"
-    save: "default_collect/tnd/02_eqpt_getBoardRip_lt_id_.txt"
-  - id: s3
+  - id: s02
     session: tnd
     command: "memm free_mem"
-    save: "default_collect/tnd/03_memm_free_mem.txt"
-  - id: s4
+    save: "default_collect/tnd/02_memm_free_mem.txt"
+  - id: s03
     session: tnd
     command: "krnl cpul_core_show_load"
-    save: "default_collect/tnd/04_krnl_cpul_core_show_load.txt"
-  - id: s5
+    save: "default_collect/tnd/03_krnl_cpul_core_show_load.txt"
+  - id: s04
     session: tnd
     command: "syst getMib"
-    save: "default_collect/tnd/05_syst_getMib.txt"
-  - id: s6
+    save: "default_collect/tnd/04_syst_getMib.txt"
+  - id: s05
     session: tnd
     command: "alrm dar"
-    save: "default_collect/tnd/06_alrm_dar.txt"
-  - id: s7
+    save: "default_collect/tnd/05_alrm_dar.txt"
+  - id: s06
     session: tnd
     command: "alrm dt all"
-    save: "default_collect/tnd/07_alrm_dt_all.txt"
-  - id: s8
+    save: "default_collect/tnd/06_alrm_dt_all.txt"
+  - id: s07
     session: tnd
     command: "cmd buildVersion"
-    save: "default_collect/tnd/08_cmd_buildVersion.txt"
-  - id: s9
+    save: "default_collect/tnd/07_cmd_buildVersion.txt"
+  - id: s08
     session: tnd
     command: "clk clk_states"
-    save: "default_collect/tnd/09_clk_clk_states.txt"
-  - id: s10
+    save: "default_collect/tnd/08_clk_clk_states.txt"
+  - id: s09
     session: tnd
     command: "clk active_clk"
-    save: "default_collect/tnd/10_clk_active_clk.txt"
-  - id: s11
+    save: "default_collect/tnd/09_clk_active_clk.txt"
+  - id: s10
     session: tnd
     command: "clk clocksInfo"
-    save: "default_collect/tnd/11_clk_clocksInfo.txt"
-  - id: s12
+    save: "default_collect/tnd/10_clk_clocksInfo.txt"
+  - id: s11
     session: tnd
     command: "clk show_ssm"
-    save: "default_collect/tnd/12_clk_show_ssm.txt"
-  - id: s13
+    save: "default_collect/tnd/11_clk_show_ssm.txt"
+  - id: s12
     session: tnd
     command: "dbg show_print"
-    save: "default_collect/tnd/13_dbg_show_print.txt"
-  - id: s14
+    save: "default_collect/tnd/12_dbg_show_print.txt"
+  - id: s13
     session: tnd
     command: "dbg qt"
-    save: "default_collect/tnd/14_dbg_qt.txt"
-  - id: s15
+    save: "default_collect/tnd/13_dbg_qt.txt"
+  - id: s14
     session: tnd
     command: "dbg qq"
-    save: "default_collect/tnd/15_dbg_qq.txt"
-  - id: s16
+    save: "default_collect/tnd/14_dbg_qq.txt"
+  - id: s15
     session: tnd
     command: "dbg qs"
-    save: "default_collect/tnd/16_dbg_qs.txt"
-  - id: s17
+    save: "default_collect/tnd/15_dbg_qs.txt"
+  - id: s16
     session: tnd
     command: "dbg ss"
-    save: "default_collect/tnd/17_dbg_ss.txt"
-  - id: s18
+    save: "default_collect/tnd/16_dbg_ss.txt"
+  - id: s17
     session: tnd
     command: "dbg qvt"
-    save: "default_collect/tnd/18_dbg_qvt.txt"
-  - id: s19
+    save: "default_collect/tnd/17_dbg_qvt.txt"
+  - id: s18
     session: tnd
     command: "dbg rvt RPRT self"
-    save: "default_collect/tnd/19_dbg_rvt_RPRT_self.txt"
-  - id: s20
+    save: "default_collect/tnd/18_dbg_rvt_RPRT_self.txt"
+  - id: s19
     session: tnd
     command: "dbg rvt NPRT self"
-    save: "default_collect/tnd/20_dbg_rvt_NPRT_self.txt"
-  - id: s21
+    save: "default_collect/tnd/19_dbg_rvt_NPRT_self.txt"
+  - id: s20
     session: tnd
     command: "dbg rvt EPRT self"
-    save: "default_collect/tnd/21_dbg_rvt_EPRT_self.txt"
-  - id: s22
+    save: "default_collect/tnd/20_dbg_rvt_EPRT_self.txt"
+  - id: s21
     session: tnd
     command: "dump /Dbase/SwMgnt.ini"
-    save: "default_collect/tnd/22_dump_Dbase_SwMgnt_ini.txt"
-  - id: s23
+    save: "default_collect/tnd/21_dump_Dbase_SwMgnt_ini.txt"
+  - id: s22
     session: tnd
     command: "dump {{db_running_container}}/Ipd/config.cfg"
-    save: "default_collect/tnd/23_dump_db_running_container_Ipd_config_cfg.txt"
-  - id: s24
+    save: "default_collect/tnd/22_dump_db_running_container_Ipd_config_cfg.txt"
+  - id: s23
     session: tnd
     command: "dump /var/log/diagnostic"
-    save: "default_collect/tnd/24_dump_var_log_diagnostic.txt"
-  - id: s25
+    save: "default_collect/tnd/23_dump_var_log_diagnostic.txt"
+  - id: s24
     session: tnd
     command: "dump /var/log/auth_def.log"
-    save: "default_collect/tnd/25_dump_var_log_auth_def_log.txt"
-  - id: s26
+    save: "default_collect/tnd/24_dump_var_log_auth_def_log.txt"
+  - id: s25
     session: tnd
     command: "dump /var/crashlog/thisNtCr.log"
-    save: "default_collect/tnd/26_dump_var_crashlog_thisNtCr_log.txt"
-  - id: s27
+    save: "default_collect/tnd/25_dump_var_crashlog_thisNtCr_log.txt"
+  - id: s26
     session: tnd
     command: "dir /"
-    save: "default_collect/tnd/27_dir_.txt"
-  - id: s28
+    save: "default_collect/tnd/26_dir_.txt"
+  - id: s27
     session: tnd
     command: "dir /var/"
-    save: "default_collect/tnd/28_dir_var_.txt"
-  - id: s29
+    save: "default_collect/tnd/27_dir_var_.txt"
+  - id: s28
     session: tnd
     command: "dir /var/log"
-    save: "default_collect/tnd/29_dir_var_log.txt"
+    save: "default_collect/tnd/28_dir_var_log.txt"
+  - id: s29
+    session: tnd
+    command: "dir /var/cmd"
+    save: "default_collect/tnd/29_dir_var_cmd.txt"
   - id: s30
     session: tnd
-    command: "dir /var/cmd"
-    save: "default_collect/tnd/30_dir_var_cmd.txt"
+    command: "dir /var/bsnap"
+    save: "default_collect/tnd/30_dir_var_bsnap.txt"
   - id: s31
     session: tnd
-    command: "dir /var/bsnap"
-    save: "default_collect/tnd/31_dir_var_bsnap.txt"
+    command: "dir /var/sessTbl"
+    save: "default_collect/tnd/31_dir_var_sessTbl.txt"
   - id: s32
     session: tnd
-    command: "dir /var/sessTbl"
-    save: "default_collect/tnd/32_dir_var_sessTbl.txt"
+    command: "dir /var/pmv"
+    save: "default_collect/tnd/32_dir_var_pmv.txt"
   - id: s33
     session: tnd
-    command: "dir /var/pmv"
-    save: "default_collect/tnd/33_dir_var_pmv.txt"
+    command: "dir /var/pmd"
+    save: "default_collect/tnd/33_dir_var_pmd.txt"
   - id: s34
     session: tnd
-    command: "dir /var/pmd"
-    save: "default_collect/tnd/34_dir_var_pmd.txt"
+    command: "dir /var/cmd"
+    save: "default_collect/tnd/34_dir_var_cmd.txt"
   - id: s35
     session: tnd
-    command: "dir /var/cmd"
-    save: "default_collect/tnd/35_dir_var_cmd.txt"
+    command: "dir /var/cmd/nt_sftp"
+    save: "default_collect/tnd/35_dir_var_cmd_nt_sftp.txt"
   - id: s36
     session: tnd
-    command: "dir /var/cmd/nt_sftp"
-    save: "default_collect/tnd/36_dir_var_cmd_nt_sftp.txt"
+    command: "dir /data/"
+    save: "default_collect/tnd/36_dir_data_.txt"
   - id: s37
     session: tnd
-    command: "dir /data/"
-    save: "default_collect/tnd/37_dir_data_.txt"
+    command: "dir /data/IPDR"
+    save: "default_collect/tnd/37_dir_data_IPDR.txt"
   - id: s38
     session: tnd
-    command: "dir /data/IPDR"
-    save: "default_collect/tnd/38_dir_data_IPDR.txt"
+    command: "dir /data/err_nta"
+    save: "default_collect/tnd/38_dir_data_err_nta.txt"
   - id: s39
     session: tnd
-    command: "dir /data/err_nta"
-    save: "default_collect/tnd/39_dir_data_err_nta.txt"
+    command: "dir /data/err_ntb"
+    save: "default_collect/tnd/39_dir_data_err_ntb.txt"
   - id: s40
     session: tnd
-    command: "dir /data/err_ntb"
-    save: "default_collect/tnd/40_dir_data_err_ntb.txt"
+    command: "dir /data/err_lts"
+    save: "default_collect/tnd/40_dir_data_err_lts.txt"
   - id: s41
     session: tnd
-    command: "dir /data/err_lts"
-    save: "default_collect/tnd/41_dir_data_err_lts.txt"
+    command: "dir /data/syslog"
+    save: "default_collect/tnd/41_dir_data_syslog.txt"
   - id: s42
     session: tnd
-    command: "dir /data/syslog"
-    save: "default_collect/tnd/42_dir_data_syslog.txt"
+    command: "dir /data/config"
+    save: "default_collect/tnd/42_dir_data_config.txt"
   - id: s43
     session: tnd
-    command: "dir /data/config"
-    save: "default_collect/tnd/43_dir_data_config.txt"
+    command: "dir /Sw"
+    save: "default_collect/tnd/43_dir_Sw.txt"
   - id: s44
     session: tnd
-    command: "dir /Sw"
-    save: "default_collect/tnd/44_dir_Sw.txt"
+    command: "err stats"
+    save: "default_collect/tnd/44_err_stats.txt"
   - id: s45
     session: tnd
-    command: "err stats"
-    save: "default_collect/tnd/45_err_stats.txt"
+    command: "err getunr"
+    save: "default_collect/tnd/45_err_getunr.txt"
   - id: s46
     session: tnd
-    command: "err getunr"
-    save: "default_collect/tnd/46_err_getunr.txt"
+    command: "err printCAB"
+    save: "default_collect/tnd/46_err_printCAB.txt"
   - id: s47
     session: tnd
-    command: "err printCAB"
-    save: "default_collect/tnd/47_err_printCAB.txt"
+    command: "inic showStates"
+    save: "default_collect/tnd/47_inic_showStates.txt"
   - id: s48
     session: tnd
-    command: "inic showStates"
-    save: "default_collect/tnd/48_inic_showStates.txt"
+    command: "lxmg GetLanxStatus"
+    save: "default_collect/tnd/48_lxmg_GetLanxStatus.txt"
   - id: s49
     session: tnd
-    command: "lxmg GetLanxStatus"
-    save: "default_collect/tnd/49_lxmg_GetLanxStatus.txt"
+    command: "pelo get_reset_counter"
+    save: "default_collect/tnd/49_pelo_get_reset_counter.txt"
   - id: s50
     session: tnd
-    command: "pelo get_reset_counter"
-    save: "default_collect/tnd/50_pelo_get_reset_counter.txt"
+    command: "pelo get_delete_level"
+    save: "default_collect/tnd/50_pelo_get_delete_level.txt"
   - id: s51
     session: tnd
-    command: "pelo get_delete_level"
-    save: "default_collect/tnd/51_pelo_get_delete_level.txt"
+    command: "pelo get_asamSysStatus"
+    save: "default_collect/tnd/51_pelo_get_asamSysStatus.txt"
   - id: s52
     session: tnd
-    command: "pelo get_asamSysStatus"
-    save: "default_collect/tnd/52_pelo_get_asamSysStatus.txt"
+    command: "prot display"
+    save: "default_collect/tnd/52_prot_display.txt"
   - id: s53
     session: tnd
-    command: "prot display"
-    save: "default_collect/tnd/53_prot_display.txt"
+    command: "sock list"
+    save: "default_collect/tnd/53_sock_list.txt"
   - id: s54
     session: tnd
-    command: "sock list"
-    save: "default_collect/tnd/54_sock_list.txt"
+    command: "swoloi states"
+    save: "default_collect/tnd/54_swoloi_states.txt"
   - id: s55
     session: tnd
-    command: "swoloi states"
-    save: "default_collect/tnd/55_swoloi_states.txt"
+    command: "temp getTemperature"
+    save: "default_collect/tnd/55_temp_getTemperature.txt"
   - id: s56
     session: tnd
-    command: "temp getTemperature"
-    save: "default_collect/tnd/56_temp_getTemperature.txt"
+    command: "version"
+    save: "default_collect/tnd/56_version.txt"
   - id: s57
     session: tnd
-    command: "version"
-    save: "default_collect/tnd/57_version.txt"
+    command: "xapi time"
+    save: "default_collect/tnd/57_xapi_time.txt"
   - id: s58
     session: tnd
-    command: "xapi time"
-    save: "default_collect/tnd/58_xapi_time.txt"
+    command: "linux cat /proc/interrupts"
+    save: "default_collect/tnd/58_linux_cat_proc_interrupts.txt"
   - id: s59
     session: tnd
-    command: "linux cat /proc/interrupts"
-    save: "default_collect/tnd/59_linux_cat_proc_interrupts.txt"
+    command: "linux df -h"
+    save: "default_collect/tnd/59_linux_df_h.txt"
   - id: s60
     session: tnd
-    command: "linux df -h"
-    save: "default_collect/tnd/60_linux_df_h.txt"
+    command: "linux free -m"
+    save: "default_collect/tnd/60_linux_free_m.txt"
   - id: s61
     session: tnd
-    command: "linux free -m"
-    save: "default_collect/tnd/61_linux_free_m.txt"
+    command: "linux cat /proc/meminfo"
+    save: "default_collect/tnd/61_linux_cat_proc_meminfo.txt"
   - id: s62
     session: tnd
-    command: "linux cat /proc/meminfo"
-    save: "default_collect/tnd/62_linux_cat_proc_meminfo.txt"
+    command: "linux cat /proc/vmstat"
+    save: "default_collect/tnd/62_linux_cat_proc_vmstat.txt"
   - id: s63
     session: tnd
-    command: "linux cat /proc/vmstat"
-    save: "default_collect/tnd/63_linux_cat_proc_vmstat.txt"
+    command: "linux mpstat -A"
+    save: "default_collect/tnd/63_linux_mpstat_A.txt"
   - id: s64
     session: tnd
-    command: "linux mpstat -A"
-    save: "default_collect/tnd/64_linux_mpstat_A.txt"
+    command: "linux top -Hn 1"
+    save: "default_collect/tnd/64_linux_top_Hn_1.txt"
   - id: s65
     session: tnd
-    command: "linux top -Hn 1"
-    save: "default_collect/tnd/65_linux_top_Hn_1.txt"
-  - id: s66
-    session: tnd
     command: "linux top -n 1"
-    save: "default_collect/tnd/66_linux_top_n_1.txt"
+    save: "default_collect/tnd/65_linux_top_n_1.txt"
   # SCP file-download: /mnt/reboot_info (transfer, not a CLI command)

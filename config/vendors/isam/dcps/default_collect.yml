@@ -48,244 +48,241 @@ steps:
     command: "login list"
   - id: s13
     session: tnd
-    command: "eqpt getBoardRip {{lt_id}}"
+    command: "memm free_mem"
   - id: s14
     session: tnd
-    command: "memm free_mem"
+    command: "krnl cpul_core_show_load"
   - id: s15
     session: tnd
-    command: "krnl cpul_core_show_load"
+    command: "syst getMib"
   - id: s16
     session: tnd
-    command: "syst getMib"
+    command: "alrm dar"
   - id: s17
     session: tnd
-    command: "alrm dar"
+    command: "alrm dt all"
   - id: s18
     session: tnd
-    command: "alrm dt all"
+    command: "cmd buildVersion"
   - id: s19
     session: tnd
-    command: "cmd buildVersion"
+    command: "clk clk_states"
   - id: s20
     session: tnd
-    command: "clk clk_states"
+    command: "clk active_clk"
   - id: s21
     session: tnd
-    command: "clk active_clk"
+    command: "clk clocksInfo"
   - id: s22
     session: tnd
-    command: "clk clocksInfo"
+    command: "clk show_ssm"
   - id: s23
     session: tnd
-    command: "clk show_ssm"
+    command: "dbg show_print"
   - id: s24
     session: tnd
-    command: "dbg show_print"
+    command: "dbg qt"
   - id: s25
     session: tnd
-    command: "dbg qt"
+    command: "dbg qq"
   - id: s26
     session: tnd
-    command: "dbg qq"
+    command: "dbg qs"
   - id: s27
     session: tnd
-    command: "dbg qs"
+    command: "dbg ss"
   - id: s28
     session: tnd
-    command: "dbg ss"
+    command: "dbg qvt"
   - id: s29
     session: tnd
-    command: "dbg qvt"
+    command: "dbg rvt RPRT self"
   - id: s30
     session: tnd
-    command: "dbg rvt RPRT self"
+    command: "dbg rvt NPRT self"
   - id: s31
     session: tnd
-    command: "dbg rvt NPRT self"
+    command: "dbg rvt EPRT self"
   - id: s32
     session: tnd
-    command: "dbg rvt EPRT self"
+    command: "dump /Dbase/SwMgnt.ini"
   - id: s33
     session: tnd
-    command: "dump /Dbase/SwMgnt.ini"
+    command: "dump {{db_running_container}}/Ipd/config.cfg"
   - id: s34
     session: tnd
-    command: "dump {{db_running_container}}/Ipd/config.cfg"
+    command: "dump /var/log/diagnostic"
   - id: s35
     session: tnd
-    command: "dump /var/log/diagnostic"
+    command: "dump /var/log/auth_def.log"
   - id: s36
     session: tnd
-    command: "dump /var/log/auth_def.log"
+    command: "dump /var/crashlog/thisNtCr.log"
   - id: s37
     session: tnd
-    command: "dump /var/crashlog/thisNtCr.log"
+    command: "dir /"
   - id: s38
     session: tnd
-    command: "dir /"
+    command: "dir /var/"
   - id: s39
     session: tnd
-    command: "dir /var/"
+    command: "dir /var/log"
   - id: s40
     session: tnd
-    command: "dir /var/log"
+    command: "dir /var/cmd"
   - id: s41
     session: tnd
-    command: "dir /var/cmd"
+    command: "dir /var/bsnap"
   - id: s42
     session: tnd
-    command: "dir /var/bsnap"
+    command: "dir /var/sessTbl"
   - id: s43
     session: tnd
-    command: "dir /var/sessTbl"
+    command: "dir /var/pmv"
   - id: s44
     session: tnd
-    command: "dir /var/pmv"
+    command: "dir /var/pmd"
   - id: s45
     session: tnd
-    command: "dir /var/pmd"
+    command: "dir /var/cmd"
   - id: s46
     session: tnd
-    command: "dir /var/cmd"
+    command: "dir /var/cmd/nt_sftp"
   - id: s47
     session: tnd
-    command: "dir /var/cmd/nt_sftp"
+    command: "dir /data/"
   - id: s48
     session: tnd
-    command: "dir /data/"
+    command: "dir /data/IPDR"
   - id: s49
     session: tnd
-    command: "dir /data/IPDR"
+    command: "dir /data/err_nta"
   - id: s50
     session: tnd
-    command: "dir /data/err_nta"
+    command: "dir /data/err_ntb"
   - id: s51
     session: tnd
-    command: "dir /data/err_ntb"
+    command: "dir /data/err_lts"
   - id: s52
     session: tnd
-    command: "dir /data/err_lts"
+    command: "dir /data/syslog"
   - id: s53
     session: tnd
-    command: "dir /data/syslog"
+    command: "dir /data/config"
   - id: s54
     session: tnd
-    command: "dir /data/config"
+    command: "dir /Sw"
   - id: s55
     session: tnd
-    command: "dir /Sw"
+    command: "err stats"
   - id: s56
     session: tnd
-    command: "err stats"
+    command: "err getunr"
   - id: s57
     session: tnd
-    command: "err getunr"
+    command: "err printCAB"
   - id: s58
     session: tnd
-    command: "err printCAB"
+    command: "inic showStates"
   - id: s59
     session: tnd
-    command: "inic showStates"
+    command: "lxmg GetLanxStatus"
   - id: s60
     session: tnd
-    command: "lxmg GetLanxStatus"
+    command: "pelo get_reset_counter"
   - id: s61
     session: tnd
-    command: "pelo get_reset_counter"
+    command: "pelo get_delete_level"
   - id: s62
     session: tnd
-    command: "pelo get_delete_level"
+    command: "pelo get_asamSysStatus"
   - id: s63
     session: tnd
-    command: "pelo get_asamSysStatus"
+    command: "prot display"
   - id: s64
     session: tnd
-    command: "prot display"
+    command: "sock list"
   - id: s65
     session: tnd
-    command: "sock list"
+    command: "swoloi states"
   - id: s66
     session: tnd
-    command: "swoloi states"
+    command: "temp getTemperature"
   - id: s67
     session: tnd
-    command: "temp getTemperature"
+    command: "version"
   - id: s68
     session: tnd
-    command: "version"
+    command: "xapi time"
   - id: s69
     session: tnd
-    command: "xapi time"
+    command: "linux cat /proc/interrupts"
   - id: s70
     session: tnd
-    command: "linux cat /proc/interrupts"
+    command: "linux df -h"
   - id: s71
     session: tnd
-    command: "linux df -h"
+    command: "linux free -m"
   - id: s72
     session: tnd
-    command: "linux free -m"
+    command: "linux cat /proc/meminfo"
   - id: s73
     session: tnd
-    command: "linux cat /proc/meminfo"
+    command: "linux cat /proc/vmstat"
   - id: s74
     session: tnd
-    command: "linux cat /proc/vmstat"
+    command: "linux mpstat -A"
   - id: s75
     session: tnd
-    command: "linux mpstat -A"
+    command: "linux top -Hn 1"
   - id: s76
     session: tnd
-    command: "linux top -Hn 1"
+    command: "linux top -n 1"
   - id: s77
     session: tnd
-    command: "linux top -n 1"
+    command: "memm free_mem"
   - id: s78
     session: tnd
-    command: "memm free_mem"
+    command: "krnl cpul_core_show_load"
   - id: s79
     session: tnd
-    command: "krnl cpul_core_show_load"
+    command: "cmd buildVersion"
   - id: s80
     session: tnd
-    command: "cmd buildVersion"
+    command: "version"
   - id: s81
     session: tnd
-    command: "version"
+    command: "xapi time"
   - id: s82
     session: tnd
-    command: "xapi time"
+    command: "linux df -h"
   - id: s83
     session: tnd
-    command: "linux df -h"
+    command: "linux free -m"
   - id: s84
     session: tnd
-    command: "linux free -m"
+    command: "linux cat /proc/meminfo"
   - id: s85
     session: tnd
-    command: "linux cat /proc/meminfo"
+    command: "linux cat /proc/vmstat"
   - id: s86
     session: tnd
-    command: "linux cat /proc/vmstat"
+    command: "linux mpstat -A"
   - id: s87
     session: tnd
-    command: "linux mpstat -A"
+    command: "linux top -Hn 1"
   - id: s88
     session: tnd
-    command: "linux top -Hn 1"
+    command: "linux top -n 1"
   - id: s89
     session: tnd
-    command: "linux top -n 1"
+    command: "linux cat /mnt/reboot_info/reboot_info"
   - id: s90
     session: tnd
-    command: "linux cat /mnt/reboot_info/reboot_info"
+    command: "linux cat /proc/interrupts"
   - id: s91
     session: tnd
-    command: "linux cat /proc/interrupts"
-  - id: s92
-    session: tnd
     command: "inic showStartupTimes"
-  - id: s93
+  - id: s92
     session: tnd
     command: "inic showStates"
