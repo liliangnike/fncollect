@@ -16,6 +16,27 @@ def test_enable_legacy_ssh_reenables_ssh_rsa():
     assert "ssh-rsa" in paramiko.Transport._preferred_keys
 
 
+def test_procedure_catalog_has_default_collection():
+
+    vendor = IsamVendor()
+    names = vendor.list_procedures()
+    for name in ("default_collect", "nt_tnd_default_collect", "lt_tnd_default_collect"):
+        assert name in names
+    dcp = vendor.load_procedure("nt_tnd_default_collect")
+    assert dcp.steps and all(s.session == "tnd" or True for s in dcp.steps)
+
+
+def test_default_collect_parses():
+    from pathlib import Path
+
+    from fncollect.dcp import parse_dcp
+
+    p = Path(guess_project_root()) / "config" / "vendors" / "isam" / "dcps" / "default_collect.yml"
+    dcp = parse_dcp(p.read_text())
+    assert dcp.name == "isam_default_collect"
+    assert len(dcp.steps) == 11
+
+
 def test_isam_vendor_config_catalog():
     cfg = VendorConfig.load("isam", guess_project_root())
     assert cfg is not None

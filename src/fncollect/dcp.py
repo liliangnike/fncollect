@@ -65,13 +65,13 @@ class DcpDefinition:
 def parse_dcp(raw: str | dict[str, Any]) -> DcpDefinition:
     if isinstance(raw, str):
         raw = yaml.safe_load(raw)
-    parameters = [Parameter(**p) for p in raw.get("parameters", [])]
-    steps = [DcpStep(**step) for step in raw.get("steps", [])]
+    parameters = [Parameter(**p) for p in (raw.get("parameters") or [])]
+    steps = [DcpStep(**step) for step in (raw.get("steps") or [])]
     return DcpDefinition(
         name=raw.get("name", "unnamed"),
         vendor=raw.get("vendor", ""),
         parameters=parameters,
-        derivations=raw.get("derivations", []),
+        derivations=raw.get("derivations") or [],
         steps=steps,
     )
 

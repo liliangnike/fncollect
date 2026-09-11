@@ -66,18 +66,21 @@ class Progress:
 
     def stage(self, name: str, total_steps: int) -> _Bar:
         """A stage bar (e.g. prepare/collect/post); advances per step."""
-        bar = self._bar(f"({self._level}) {name}", total_steps, leave=True, unit="step")
+        desc = f"({self._level}) {name}"
+        bar = self._bar(desc, total_steps, leave=True, unit="step")
         self._level += 1
-        return _Bar(bar, self)
+        return _Bar(bar, self, desc)
 
     def steps(self, name: str, total: int) -> _Bar:
         """A procedure/step bar; advances per command execution."""
-        bar = self._bar(f"    {name}", total, leave=False, unit="cmd")
-        return _Bar(bar, self)
+        desc = f"    {name}"
+        bar = self._bar(desc, total, leave=False, unit="cmd")
+        return _Bar(bar, self, desc)
 
     def command(self, name: str, total: int = 1) -> _Bar:
-        bar = self._bar(f"        {name}", total, leave=False, unit="")
-        return _Bar(bar, self)
+        desc = f"        {name}"
+        bar = self._bar(desc, total, leave=False, unit="")
+        return _Bar(bar, self, desc)
 
     def down(self) -> None:
         if self._level > 0:
@@ -85,10 +88,10 @@ class Progress:
 
 
 class _Bar:
-    def __init__(self, tq: tqdm, prog: Progress) -> None:
+    def __init__(self, tq: tqdm, prog: Progress, desc: str = "") -> None:
         self._tq = tq
         self._prog = prog
-        self._desc = tq.desc or ""
+        self._desc = desc
         # draw the initial 0% state immediately (not after the first update)
         self._refresh()
 

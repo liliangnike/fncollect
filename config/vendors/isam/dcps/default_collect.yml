@@ -1,0 +1,52 @@
+name: isam_default_collect
+vendor: isam
+description: |
+  Nokia ISAM (7360/7362) OLT shelf default collection -- baseline read-only
+  troubleshooting logs run on the OLT CLI session. Scope follows the
+  NGALEXX ISAM GENERIC/COMMON default-collection command set (sntp, software,
+  equipment, transceivers, config, alarms). Outputs are saved under
+  default_collect/.
+steps:
+  - id: sntp
+    command: "show sntp"
+    save: "default_collect/system/sntp.txt"
+
+  - id: oswp
+    command: "show software-mngt oswp"
+    save: "default_collect/software/oswp.txt"
+
+  - id: equipment_temperature
+    command: "show equipment temperature"
+    save: "default_collect/equipment/temperature.txt"
+
+  - id: transceiver_inventory
+    command: "show equipment transceiver-inventory detail"
+    save: "default_collect/equipment/transceiver-inventory.txt"
+
+  - id: sfp_diagnostics
+    command: "show equipment diagnostics sfp detail"
+    save: "default_collect/equipment/sfp-diagnostics.txt"
+
+  - id: config_generic_pon
+    command: "info configure generic-pon"
+    save: "default_collect/config/generic-pon.txt"
+
+  - id: config_pon
+    command: "info configure pon"
+    save: "default_collect/config/pon.txt"
+
+  - id: alarm_current_table
+    command: "show alarm current table"
+    save: "default_collect/alarm/current-table.txt"
+
+  - id: alarm_current_olt
+    command: "show alarm current olt-gen"
+    save: "default_collect/alarm/current-olt-gen.txt"
+
+  - id: alarm_delta_critical
+    command: "show alarm delta-log critical"
+    save: "default_collect/alarm/delta-critical.txt"
+
+  - id: alarm_delta_major
+    command: "show alarm delta-log major"
+    save: "default_collect/alarm/delta-major.txt"

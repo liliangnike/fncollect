@@ -1,0 +1,72 @@
+name: isam_lt_tnd_default_collect
+vendor: isam
+description: |
+  Nokia ISAM shelf default collection -- LT TND GENERIC/COMMON commands on each enabled LT board TND session (per NGALEXX LT_TND.json). Requires entering the LT board TND context.
+steps:
+  - id: s1
+    session: tnd
+    command: "memm free_mem"
+    save: "default_collect/tnd/01_memm_free_mem.txt"
+  - id: s2
+    session: tnd
+    command: "krnl cpul_core_show_load"
+    save: "default_collect/tnd/02_krnl_cpul_core_show_load.txt"
+  - id: s3
+    session: tnd
+    command: "cmd buildVersion"
+    save: "default_collect/tnd/03_cmd_buildVersion.txt"
+  - id: s4
+    session: tnd
+    command: "version"
+    save: "default_collect/tnd/04_version.txt"
+  - id: s5
+    session: tnd
+    command: "xapi time"
+    save: "default_collect/tnd/05_xapi_time.txt"
+  - id: s6
+    session: tnd
+    command: "linux df -h"
+    save: "default_collect/tnd/06_linux_df_h.txt"
+  - id: s7
+    session: tnd
+    command: "linux free -m"
+    save: "default_collect/tnd/07_linux_free_m.txt"
+  - id: s8
+    session: tnd
+    command: "linux cat /proc/meminfo"
+    save: "default_collect/tnd/08_linux_cat_proc_meminfo.txt"
+  - id: s9
+    session: tnd
+    command: "linux cat /proc/vmstat"
+    save: "default_collect/tnd/09_linux_cat_proc_vmstat.txt"
+  - id: s10
+    session: tnd
+    command: "linux mpstat -A"
+    save: "default_collect/tnd/10_linux_mpstat_A.txt"
+  - id: s11
+    session: tnd
+    command: "linux top -Hn 1"
+    save: "default_collect/tnd/11_linux_top_Hn_1.txt"
+  - id: s12
+    session: tnd
+    command: "linux top -n 1"
+    save: "default_collect/tnd/12_linux_top_n_1.txt"
+  - id: s13
+    session: tnd
+    command: "linux cat /mnt/reboot_info/reboot_info"
+    save: "default_collect/tnd/13_linux_cat_mnt_reboot_info_reboot_info.txt"
+  - id: s14
+    session: tnd
+    command: "linux cat /proc/interrupts"
+    save: "default_collect/tnd/14_linux_cat_proc_interrupts.txt"
+  - id: s15
+    session: tnd
+    command: "inic showStartupTimes"
+    save: "default_collect/tnd/15_inic_showStartupTimes.txt"
+  - id: s16
+    session: tnd
+    command: "inic showStates"
+    save: "default_collect/tnd/16_inic_showStates.txt"
+  # SCP file-download: /var/log (transfer, not a CLI command)
+  # SCP file-download: /mnt/reboot_info (transfer, not a CLI command)
+  # SCP file-download: /isam/slot_default/run/var (transfer, not a CLI command)
