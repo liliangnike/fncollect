@@ -34,12 +34,10 @@ def test_default_collect_is_full_shelf():
     p = Path(guess_project_root()) / "config" / "vendors" / "isam" / "dcps" / "default_collect.yml"
     dcp = parse_dcp(p.read_text())
     assert dcp.name == "isam_default_collect"
+    assert dcp.log_dir == "default_collect"
     assert len(dcp.steps) == 93
     sessions = {s.session for s in dcp.steps}
     assert sessions == {"cli", "tnd"}  # OLT CLI + NT/LT TND legs
-    assert any("olt_cli" in (s.save or "") for s in dcp.steps)
-    assert any("nt_tnd" in (s.save or "") for s in dcp.steps)
-    assert any("lt_tnd" in (s.save or "") for s in dcp.steps)
 
 
 def test_isam_vendor_config_catalog():

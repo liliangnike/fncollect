@@ -14,6 +14,7 @@ import logging
 import re
 import shutil
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,11 +43,27 @@ class RunContext:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.device_root = self.dir / "devices"
         self.report_root = self.dir / "reports"
-        self._manifest: dict[str, Any] = {
+        self.manifest_path = self.dir / "manifest.json"
+        self._manifest = self._build_manifest(stamp)
+        self._session_log_dir: str | None = None
+
+    def _build_manifest(self, started_at: str) -> dict:
+        return {
             "session_id": self.session_id,
-            "started_at": stamp,
+            "started_at": started_at,
             "artifacts": [],
         }
+
+    @contextmanager
+    def session_logs_in(self, subdir: str | None):
+        """Scope session-log files into a subdirectory for the duration of a
+        procedure (e.g. under a procedure's own directory)."""
+        previous = self._session_log_dir
+        self._session_log_dir = subdir
+        try:
+            yield
+        finally:
+            self._session_log_dir = previous
 
     def record_meta(self, meta: dict[str, Any]) -> None:
         self._manifest.update(meta)
@@ -95,12 +112,17 @@ class RunContext:
         captured output is preserved, with one log file per session type
         (e.g. ``device_session_cli.log`` for OLT CLI, ``device_session_tnd.log``
         for NT_TND). Falls back to ``device_session.log`` when no session name
-        is known.
+        is known. When scoped by ``session_logs_in``, files land under that
+        procedure directory.
         """
         filename = "device_session.log"
         if session:
             filename = f"device_session_{sanitize(session)}.log"
-        path = self.dir / filename
+        base = self.dir
+        if self._session_log_dir:
+            base = self.dir / self._session_log_dir
+            base.mkdir(parents=True, exist_ok=True)
+        path = base / filename
         with path.open("a", encoding="utf-8", errors="replace") as handle:
             handle.write(f">>> {command}\n")
             if output and not output.endswith("\n"):

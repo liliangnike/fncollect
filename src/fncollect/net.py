@@ -83,7 +83,16 @@ class InteractiveSshSession(Session):
         self._client: paramiko.SSHClient | None = None
         self._chan = None
         self.prompt: str | None = None
-        self._prompt_re = re.compile(r"(" + self.prompt_pattern + r")\s*$")
+        self._prompt_re = self._compile(self.prompt_pattern)
+
+    @staticmethod
+    def _compile(pattern: str) -> re.Pattern:
+        return re.compile(r"(" + pattern + r")\s*$")
+
+    def set_prompt(self, pattern: str) -> None:
+        """Switch the active prompt pattern for a new session context."""
+        self.prompt_pattern = pattern
+        self._prompt_re = self._compile(pattern)
 
     def _connect_blocking(self) -> None:
         if paramiko is None:  # pragma: no cover

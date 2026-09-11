@@ -3,6 +3,7 @@
 
 import pytest
 
+from fncollect.context import Context
 from fncollect.dcp import DcpDefinition, DcpStep, execute_dcp
 from fncollect.session_manager import SessionManager
 from fncollect.sessions import CommandResult
@@ -13,13 +14,17 @@ class FakeSession:
         self.tag = tag
         self.commands: list[str] = []
         self.connect_calls = 0
+        self.prompt = "base"
 
     async def connect(self) -> None:
         self.connect_calls += 1
 
+    def set_prompt(self, pattern: str) -> None:
+        self.prompt = pattern
+
     async def exec_cmd(self, command: str) -> CommandResult:
         self.commands.append(command)
-        return CommandResult(command=command, output=f"[{self.tag}] {command}")
+        return CommandResult(command=command, output=f"[{self.prompt}] {command}", session=self.tag)
 
     async def close(self) -> None:
         pass
@@ -123,3 +128,36 @@ async def test_unreachable_session_fails_fast_after_first_attempt():
     with pytest.raises(ConnectionError):
         await manager.exec_cmd("b", session="tnd")
     assert tnd.connect_calls == 1  # still only one connect attempt
+
+
+async def test_exec_target_navigates_to_lt_and_back():
+    cli = FakeSession("cli")
+    tnd = FakeSession("tnd")
+    tnd.prompt_pattern = "^nt$"  # TND connection's base context = active NT
+    manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
+    manager.set_contexts({
+        "cli": Context("cli", "cli", "^cli$"),
+        "nt": Context("nt", "tnd", "^nt$"),
+        "lt": Context("lt", "tnd", "^lt$", enter=["login board {id}"], exit=["exit"], params={"id": ""}),
+    })
+
+    await manager.exec_target("lt:1103", "memm free_mem")
+    # entered LT board via login, ran command, then exited
+    assert tnd.commands[0] == "login board 1103"
+    assert tnd.commands[-2] == "memm free_mem"
+    assert tnd.commands[-1] == "exit"
+    # prompt was restored to the active-NT (TND base) after exit
+    assert tnd.prompt == "^nt$"
+
+
+async def test_exec_target_nt_no_enter():
+    cli = FakeSession("cli")
+    tnd = FakeSession("tnd")
+    manager = SessionManager({"cli": cli, "tnd": tnd}, default="cli")
+    manager.set_contexts({
+        "cli": Context("cli", "cli", "^cli$"),
+        "nt": Context("nt", "tnd", "^nt$"),
+    })
+    await manager.exec_target("nt", "version")
+    assert tnd.commands == ["version"]
+    assert tnd.prompt == "^nt$"

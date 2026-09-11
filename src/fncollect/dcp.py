@@ -48,6 +48,7 @@ class DcpStep:
     skip: bool = False
     session: str | None = None
     switch: str | None = None
+    target: str | None = None
 
 
 @dataclass
@@ -57,6 +58,7 @@ class DcpDefinition:
     parameters: list[Parameter] = field(default_factory=list)
     derivations: list[dict] = field(default_factory=list)
     steps: list[DcpStep] = field(default_factory=list)
+    log_dir: str | None = None
 
     def resolve_step(self, idx: int) -> DcpStep:
         return self.steps[idx]
@@ -73,6 +75,7 @@ def parse_dcp(raw: str | dict[str, Any]) -> DcpDefinition:
         parameters=parameters,
         derivations=raw.get("derivations") or [],
         steps=steps,
+        log_dir=raw.get("log_dir"),
     )
 
 
@@ -94,6 +97,9 @@ async def execute_dcp(
     bar = None
     if progress is not None:
         bar = progress.steps(dcp.name, len(dcp.steps))
+    # scope session-log files under the procedure's log_dir (e.g. default_collect/)
+    _log_scope = run.session_logs_in(dcp.log_dir)
+    _log_scope.__enter__()
     for idx, step in enumerate(dcp.steps):
         if idx >= max_steps:
             break
@@ -112,6 +118,7 @@ async def execute_dcp(
 
     if bar:
         bar.close()
+    _log_scope.__exit__(None, None, None)
 
     try:
         context.record_artifacts(dcp.name, run)
@@ -161,6 +168,8 @@ async def _run_step(
         command = render(step.command, context)
         if step.session:
             result = await device.exec_cmd_with_session(step.session, command)
+        elif step.target:
+            result = await device.exec_target(render(step.target, context), command)
         else:
             result = await device.exec_cmd(command) if command else None
         if result is not None:

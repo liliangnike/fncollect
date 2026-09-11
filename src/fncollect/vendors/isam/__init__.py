@@ -8,6 +8,8 @@ Bare-bones but functional; extend the command catalog in
 
 from __future__ import annotations
 
+from typing import Any
+
 from fncollect.net import InteractiveSshSession
 from fncollect.sessions import SSHSession
 from fncollect.vendor import (
@@ -51,6 +53,32 @@ class IsamVendor(Vendor):
 
     def session_types(self) -> dict[str, type[SSHSession]]:
         return {"cli": IsamCliSession, "tnd": IsamTndSession}
+
+    def session_contexts(self) -> dict[str, Any]:
+        """Logical ISAM device targets.
+
+        The TND connection carries several contexts: active NT, standby NT
+        (``login board peer_nt``) and each LT board (``login board <id>``).
+        The NT/LT TND prompt patterns are placeholders -- finalize them with
+        the real TND prompts on your network.
+        """
+        from fncollect.context import Context
+
+        cli_prompt = r"typ:\S+(?:>[^>#]+)*#"
+        nt_prompt = r"\{nt0x[0-9A-Fa-f]+\}[^>#]*#"   # TODO: real NT_TND prompt
+        lt_prompt = r"\{lt0x[0-9A-Fa-f]+\}[^>#]*#"   # TODO: real LT board prompt
+        return {
+            "cli": Context("cli", "cli", cli_prompt),
+            "nt": Context("nt", "tnd", nt_prompt),
+            "nt_peer": Context(
+                "nt_peer", "tnd", nt_prompt,
+                enter=["login board peer_nt"], exit=["exit"],
+            ),
+            "lt": Context(
+                "lt", "tnd", lt_prompt,
+                enter=["login board {id}"], exit=["exit"], params={"id": ""},
+            ),
+        }
 
     def create_hardware(self, info: DeviceInfo, session) -> Device:
         return IsamDevice(info, session)

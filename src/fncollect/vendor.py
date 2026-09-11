@@ -94,6 +94,13 @@ class Device(ABC):
     async def exec_cmd_with_session(self, session: str, command: str) -> CommandResult:
         return await self.exec_cmd(command)
 
+    async def exec_target(self, target: str, command: str) -> CommandResult:
+        """Run a command on a logical device target (e.g. cli/nt/nt_peer/lt:1103).
+
+        Default: treated as a plain command on the active session.
+        """
+        return await self.exec_cmd(command)
+
     async def get_values(self, command: str, extract: list[dict]) -> dict[str, Any]:
         """Generic read: run a command, process its output, return collected
         values keyed by name. ``extract`` items follow the value-processor
@@ -160,6 +167,11 @@ class BaseDevice(Device):
         if not result.session:
             result.session = session
         return result
+
+    async def exec_target(self, target: str, command: str) -> CommandResult:
+        if self._manager is not None:
+            return await self._manager.exec_target(target, command)
+        return await self.session.exec_cmd(command)
 
     async def disconnect(self) -> None:
         if self._manager is not None:
@@ -302,10 +314,20 @@ class Vendor(ABC):
         )
         device = self.create_hardware(info, session)
         # Multi-session devices (e.g. cli + tnd): attach a session manager so
-        # procedures can switch the active session.
+        # procedures can switch the active session / navigate to targets.
         if len(self.session_types()) >= 2 and isinstance(device, BaseDevice):
             device._manager = self.session_manager(info, cred)
+            device._manager.set_contexts(self.session_contexts())
         return device
+
+    def session_contexts(self) -> dict[str, Any]:
+        """Logical device targets (Context map) for this vendor.
+
+        Default: none. A vendor with context switching (e.g. NT_TND ->
+        ``login board`` to reach LT boards) returns a dict of
+        ``name -> fncollect.context.Context``.
+        """
+        return {}
 
     def session_manager(
         self, info: DeviceInfo, credentials: dict[str, str] | None = None
